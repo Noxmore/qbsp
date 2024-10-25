@@ -36,7 +36,7 @@ pub enum BspParseError {
     },
     #[error("Failed to parse string: {0}")]
     InvalidString(std::str::Utf8Error),
-    #[error("Wrong magic number! Expected {expected}, found {}", display_magic_number(found))]
+    #[error("Wrong magic number! Expected {expected}, found \"{}\"", display_magic_number(found))]
     WrongMagicNumber {
         found: [u8; 4],
         expected: &'static str,
@@ -204,6 +204,7 @@ impl BspData {
                     .map(|(_, v)| v)
                     .unwrap_or(&[])
             ).map_err(BspParseError::InvalidString).job("Reading entities lump")?.to_string(),
+            // entities: lump_dir.get(LumpSection::Entities).get(bsp)?.to_vec(),
             vertices: read_lump(bsp, &lump_dir, LumpSection::Vertices)?,
             planes: read_lump(bsp, &lump_dir, LumpSection::Planes)?,
             edges: read_lump(bsp, &lump_dir, LumpSection::Edges)?,

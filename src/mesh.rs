@@ -54,9 +54,10 @@ impl BspData {
         let model = &self.models[model_idx];
 
         // let mut lightmap_atlas: Grid<Option<[u8; 3]>> = Grid::new(1, 1);
-        let mut lightmap_packer = TexturePacker::new_skyline(TexturePackerConfig {
+        let mut lightmap_packer = DefaultLightmapPacker::new(TexturePackerConfig {
             // max_width: u32::MAX, // TODO do we want a max size?
             // max_height: u32::MAX,
+            max_height: u32::MAX,
             allow_rotation: false, // TODO support? frame will store if it was rotated
             force_max_dimensions: false,
             texture_padding: 0, // TODO
@@ -187,7 +188,7 @@ impl BspData {
                 // Atlas uvs will be in texture space until converted later
                 lightmap_uvs.extend(lightmap_world_uvs.into_iter().map(|mut uv| {
                     // uv -= face_extents.texture_mins.as_vec2();
-                    uv -= (world_lightmap_rect.min / 16.).floor() * 16.;
+                    uv -= (bmin * 16).as_vec2();
                     // Offset by half a texel to remove bleeding artifacts
                     uv += 8.;
                     // 16 Units per texel
@@ -207,7 +208,7 @@ impl BspData {
 
         // Finalize lightmap atlas
         let lightmap_atlas = if self.lighting.is_some() {
-            let image = lightmap_packer.export([255, 0, 0]); // TODO make customizable
+            let image = lightmap_packer.export([0; 3]); // TODO make customizable
 
             // Normalize lightmap UVs from texture space
             let atlas_size = vec2(image.width() as f32, image.height() as f32);
@@ -239,7 +240,7 @@ trait AtlasPacker {
     fn export(&self, default: [u8; 3]) -> image::RgbImage;
 }
 
-/* #[derive(Clone, Copy)]
+#[derive(Clone, Copy)]
 struct DummyTexture {
     width: u32,
     height: u32,
@@ -275,7 +276,7 @@ impl Texture for DummyTexture {
 struct DefaultLightmapPacker {
     packer: TexturePacker<'static, DummyTexture, u32>,
     // I have to store images separately, since TexturePacker doesn't give me access
-    images: Vec<image::RgbImage>,
+    images: Vec<(texture_packer::Frame<u32>, image::RgbImage)>,
 }
 impl DefaultLightmapPacker {
     pub fn new(config: TexturePackerConfig) -> Self {
@@ -286,21 +287,28 @@ impl AtlasPacker for DefaultLightmapPacker {
     fn pack(&mut self, face_idx: u32, image: image::RgbImage) -> Option<Rect> {
         self.packer.pack_own(face_idx, DummyTexture { width: image.width(), height: image.height() }).ok()?;
         self.packer.get_frame(&face_idx).map(|frame| {
-            self.images.push(image);
+            self.images.push((frame.clone(), image));
             let min = vec2(frame.frame.x as f32, frame.frame.y as f32);
             Rect { min, max: min + vec2(frame.frame.w as f32, frame.frame.h as f32) }
         })
     }
-    fn export(&self) -> image::RgbImage {
-        /* let mut image = image::RgbImage::new(self.width(), self.height());
-        for (face_idx, frame) in self.packer.get_frames() {
-            self.
+    fn export(&self, default: [u8; 3]) -> image::RgbImage {
+        let mut image = image::RgbImage::from_pixel(self.packer.width(), self.packer.height(), image::Rgb(default));
+        for (frame, lightmap_image) in &self.images {
+            // let lightmap_image = &self.images[*face_idx as usize];
+            for x in 0..frame.frame.w {
+                for y in 0..frame.frame.h {
+                    if frame.frame.x + x >= image.width() || frame.frame.y + y >= image.height() || x >= lightmap_image.width() || y >= lightmap_image.height() {
+                        continue;
+                    }
+                    *image.get_pixel_mut(frame.frame.x + x, frame.frame.y + y) = *lightmap_image.get_pixel(x, y);
+                }
+            }
         }
-        image */
-        todo!()
+        image
     }
-} */
-impl AtlasPacker for TexturePacker<'_, image::RgbImage, u32> {
+}
+/* impl AtlasPacker for TexturePacker<'_, image::RgbImage, u32> {
     fn pack(&mut self, face_idx: u32, image: image::RgbImage) -> Option<Rect> {
         self.pack_own(face_idx, image).ok()?;
         self.get_frame(&face_idx).map(|frame| {
@@ -316,7 +324,7 @@ impl AtlasPacker for TexturePacker<'_, image::RgbImage, u32> {
             |x, y| self.get(x, y).unwrap_or(image::Rgb(default)),
         )
     }
-}
+} */
 
 // struct ShelfPacker {
 //     allocator: AtlasAllocator,
