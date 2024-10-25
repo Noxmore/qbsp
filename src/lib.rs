@@ -165,6 +165,7 @@ impl LumpDirectory {
 }
 
 /// The data parsed from a BSP file.
+#[derive(Debug, Clone)]
 pub struct BspData {
     /// Essentially an embedded .map file, the differences being:
     /// - Brush data has been stripped.

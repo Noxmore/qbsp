@@ -112,7 +112,7 @@ impl<const N: usize> std::fmt::Display for FixedStr<N> {
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BoundingBox {
     pub min: Vec3,
@@ -130,7 +130,7 @@ pub struct BspEdge {
 }
 impl_bsp_read_simple!(BspEdge, a, b);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BspFace {
     /// Index of the plane the face is parallel to
@@ -171,7 +171,7 @@ impl BspFace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BspTexInfo {
     pub u_axis: Vec3,
@@ -185,7 +185,7 @@ pub struct BspTexInfo {
 }
 impl_bsp_read_simple!(BspTexInfo, u_axis, u_offset, v_axis, v_offset, texture_idx, flags);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BspModel {
     pub bound: BoundingBox,
@@ -200,7 +200,7 @@ pub struct BspModel {
 }
 impl_bsp_read_simple!(BspModel, bound, origin, head_node, visleafs, first_face, num_faces);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BspPlane {
     pub normal: Vec3,
@@ -227,6 +227,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
     Ok(textures)
 }
 
+#[derive(Clone)]
 pub struct BspTexture {
     pub header: BspTextureHeader,
     pub data: Option<Vec<u8>>,
@@ -247,6 +248,11 @@ impl BspParse for BspTexture {
         Ok(Self { header, data })
     }
 }
+impl std::fmt::Debug for BspTexture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.header.fmt(f)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct BspTextureHeader {
@@ -263,6 +269,7 @@ pub struct BspTextureHeader {
 impl_bsp_read_simple!(BspTextureHeader, name, width, height, offset_full, offset_half, offset_quarter, offset_eighth);
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.
+#[derive(Clone)]
 pub enum BspLighting {
     White(Vec<u8>),
     Colored(Vec<[u8; 3]>),
@@ -302,6 +309,14 @@ impl BspLighting {
         match self {
             Self::White(vec) => vec.len(),
             Self::Colored(vec) => vec.len(),
+        }
+    }
+}
+impl std::fmt::Debug for BspLighting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::White(vec) => write!(f, "White(...) (len: {})", vec.len()),
+            Self::Colored(vec) => write!(f, "Colored(...) (len: {})", vec.len()),
         }
     }
 }
