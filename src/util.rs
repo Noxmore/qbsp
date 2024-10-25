@@ -12,11 +12,6 @@ impl Rect {
         min: Vec2::INFINITY,
     };
 
-    #[inline]
-    pub fn size(&self) -> Vec2 {
-        self.max - self.min
-    }
-
     /// Build a new rectangle formed of the union of this rectangle and a point.
     ///
     /// The union is the smallest rectangle enclosing both the rectangle and the point. If the
