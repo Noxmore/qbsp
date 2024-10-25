@@ -1,6 +1,7 @@
 use crate::*;
 
 // Simple rectangle type partially copied from Bevy.
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Rect {
     pub min: Vec2,
     pub max: Vec2,

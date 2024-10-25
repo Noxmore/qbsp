@@ -172,7 +172,7 @@ impl BspFace {
 }
 
 // TODO Do stuff with or remove
-pub struct BspFaceExtents {
+/* pub struct BspFaceExtents {
     pub texture_mins: U16Vec2,
     pub extents: U16Vec2,
 }
@@ -215,7 +215,7 @@ impl BspFaceExtents {
             extents: (rect.size() * 16.).as_u16vec2(),
         }
     }
-}
+} */
 
 #[derive(Debug)]
 #[repr(C)]
