@@ -5,7 +5,6 @@ use crate::*;
 use texture_packer::{
     texture::Texture, TexturePacker, TexturePackerConfig
 };
-// use open_texture_packer::*;
 
 // TODO Currently, we use a rather rigid system where meshing produces one lightmap atlas, and a mesh for each texture in the model.
 //      We probably want to give the programmer more control, especially for vis support? (Not sure yet what that would look like)
@@ -24,6 +23,7 @@ pub enum MeshSeparation {
     Model,
     Material,
 }
+// ^^^ This is just temporary for now, a concept of what the api might look like
 
 /// A mesh exported from a BSP file for rendering.
 #[derive(Debug, Clone, Default)]
@@ -53,22 +53,16 @@ impl BspData {
     pub fn mesh_model(&self, model_idx: usize) -> MeshExportOutput {
         let model = &self.models[model_idx];
 
-        // let mut lightmap_atlas: Grid<Option<[u8; 3]>> = Grid::new(1, 1);
         let mut lightmap_packer = DefaultLightmapPacker::new(TexturePackerConfig {
-            // max_width: u32::MAX, // TODO do we want a max size?
-            // max_height: u32::MAX,
             max_height: u32::MAX,
-            allow_rotation: false, // TODO support? frame will store if it was rotated
+            // Sizes are consistent enough that i don't think we need to support rotation
+            allow_rotation: false,
             force_max_dimensions: false,
-            texture_padding: 0, // TODO
-            // texture_outlines: true,
-            // texture_extrusion: 1,
+            texture_padding: 0, // This defaults to 1
             ..Default::default()
         });
-        // let mut lightmap_packer = ShelfPacker::default();
 
-        
-        
+        // Group faces by texture, also storing index for packing use
         let mut grouped_faces: HashMap<&str, Vec<(u32, &BspFace)>> = Default::default();
 
         for i in model.first_face..model.first_face + model.num_faces {
@@ -81,10 +75,6 @@ impl BspData {
 
         let mut meshes = Vec::with_capacity(grouped_faces.len());
 
-        // TODO Here's where the code gets ugly, big WIP zone.
-
-        
-
         for (texture, faces) in grouped_faces {
             let mut mesh = ExportedMesh::default();
             mesh.texture = texture.to_string();
@@ -92,7 +82,6 @@ impl BspData {
             for (face_idx, face) in faces {
                 let plane = &self.planes[face.plane_idx as usize];
                 let tex_info = &self.tex_info[face.texture_info_idx as usize];
-                // let face_extents = BspFaceExtents::calculate(self, face);
                 let texture_size = self.textures[tex_info.texture_idx as usize].as_ref()
                     .map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
                     .unwrap_or(Vec2::ONE);
@@ -117,10 +106,6 @@ impl BspData {
                         pos.as_dvec3().dot(tex_info.u_axis.as_dvec3()) + tex_info.u_offset as f64,
                         pos.as_dvec3().dot(tex_info.v_axis.as_dvec3()) + tex_info.v_offset as f64,
                     ).as_vec2();
-                    // let uv = vec2(
-                    //     pos.dot(tex_info.u_axis) + tex_info.u_offset,
-                    //     pos.dot(tex_info.v_axis) + tex_info.v_offset,
-                    // );
 
                     mesh.uvs.push(uv / texture_size);
                     // Lightmap uvs have a constant scale of 16-units to 1 texel
@@ -138,12 +123,6 @@ impl BspData {
 
                 let Some(lighting) = &self.lighting else { continue };
                 let lightmap_uvs = mesh.lightmap_uvs.get_or_insert_with(Vec::new);
-                /* if face.lightmap_offset.is_negative() {
-                    // Just in case only some faces are negative (Not sure why this happens)
-                    lightmap_uvs.extend(repeat_n(Vec2::ZERO, face.num_edges as usize));
-                    println!("no lightmap on {face_idx} with {} edges:\n{lightmap_world_uvs:#?}", face.num_edges);
-                    continue;
-                } */
                 
                 let mut world_lightmap_rect = Rect::EMPTY;
                 for uv in &lightmap_world_uvs {
@@ -151,21 +130,10 @@ impl BspData {
                 }
 
                 // Face extent calculation referenced from vkQuake
-                let bmin = (world_lightmap_rect.min / 16.).floor().as_ivec2();
-                let bmax = (world_lightmap_rect.max / 16.).ceil().as_ivec2();
-                let face_lightmap_size = (bmax - bmin).as_uvec2() + 1;
-                // let face_lightmap_size_other = (world_lightmap_rect.size() / 16.).ceil().as_uvec2() + 1;
-                // let face_lightmap_size = face_extents.extents.as_uvec2() / 16 + 1;
-                // println!("{face_idx} | rect: {world_lightmap_rect:?}, min: {bmin}, max: {bmax}, out: {face_lightmap_size}, other: {face_lightmap_size_other}");
+                let i_min = (world_lightmap_rect.min / 16.).floor().as_ivec2();
+                let i_max = (world_lightmap_rect.max / 16.).ceil().as_ivec2();
+                let face_lightmap_size = (i_max - i_min).as_uvec2() + 1;
 
-                /* lightmap_packer.pack_own(face_idx, image::RgbImage::from_fn(face_lightmap_size.x, face_lightmap_size.y, |x, y| {
-                    // if x == 0 && y == 0 { return image::Rgb([0, 255, 0]) } 
-                    // image::Rgb(lighting.get(face.lightmap_offset as usize + (y * face_lightmap_size.x + x) as usize).unwrap_or_default())
-                    // let normal = ((if face.plane_side == 0 { plane.normal } else { -plane.normal }).normalize() * 255.).abs();
-                    // [normal.x as u8, normal.y as u8, normal.z as u8].into()
-                    [255; 3].into()
-                })).unwrap();
-                let frame = lightmap_packer.get_frame(&face_idx).unwrap().frame; */
                 let lightmap_image = if face.lightmap_offset.is_negative() {
                     image::RgbImage::from_pixel(face_lightmap_size.x, face_lightmap_size.y, image::Rgb([0; 3]))
                 } else {
@@ -181,27 +149,21 @@ impl BspData {
                     panic!("Failed to pack image of size {face_lightmap_size}");
                 };
                 
-                // println!("{face_idx}: {}", frame.min);
-                // println!("{}", world_lightmap_rect.min - face_extents.texture_mins.as_vec2());
-
                 // Append lightmap uvs, since lightmap face size is calculated from the uvs bounds, we don't need to resize it, just move it into place
                 // Atlas uvs will be in texture space until converted later
                 lightmap_uvs.extend(lightmap_world_uvs.into_iter().map(|mut uv| {
-                    // uv -= face_extents.texture_mins.as_vec2();
-                    uv -= (bmin * 16).as_vec2();
+                    // Move from world space into top left corner
+                    uv -= (i_min * 16).as_vec2();
                     // Offset by half a texel to remove bleeding artifacts
                     uv += 8.;
                     // 16 Units per texel
                     uv /= 16.;
+                    // Finally, move to there the lightmap starts
                     uv += frame.min;
-                    // uv += vec2(frame.x as f32, frame.y as f32);
 
                     uv
                 }));
             }
-
-            // TODO why do i do this, do i need to do this?
-            mesh.indices.dedup();
             
             meshes.push(mesh);
         }
@@ -217,8 +179,6 @@ impl BspData {
 
                 for uv in lightmap_uvs {
                     *uv /= atlas_size; // * 16
-                    // assert!(uv.x <= 1.); // TODO tmp
-                    // assert!(uv.y <= 1.);
                 }
             }
 
@@ -240,6 +200,9 @@ trait AtlasPacker {
     fn export(&self, default: [u8; 3]) -> image::RgbImage;
 }
 
+/// Currently, we use texture_packer to create atlas' and have to do
+/// this dummy texture and pixel stuff to get around the fact the packer
+/// doesn't expose its textures.
 #[derive(Clone, Copy)]
 struct DummyTexture {
     width: u32,
