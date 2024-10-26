@@ -78,8 +78,14 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
 
 /// An Id Tech 1 palette to use for embedded images.
 #[repr(C)] // Because we transmute data with QUAKE_PALETTE, don't want Rust to pull any shenanigans
+#[derive(Debug, Clone)]
 pub struct Palette {
     pub colors: [[u8; 3]; 256],
+}
+impl Default for Palette {
+    fn default() -> Self {
+        QUAKE_PALETTE.clone()
+    }
 }
 impl Palette {
     /// Parses a palette from data. Palettes must be 768 bytes in length exactly.
