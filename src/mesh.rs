@@ -39,6 +39,11 @@ pub struct ExportedMesh {
     /// Triangle list.
     pub indices: Vec<[u32; 3]>,
 
+    pub tex_flags: BspTexFlags,
+
+    /// All faces in the bsp data used to create this mesh.
+    pub faces: Vec<u32>,
+
     pub texture: String,
 }
 
@@ -63,23 +68,26 @@ impl BspData {
         });
 
         // Group faces by texture, also storing index for packing use
-        let mut grouped_faces: HashMap<&str, Vec<(u32, &BspFace)>> = Default::default();
+        let mut grouped_faces: HashMap<(&str, BspTexFlags), Vec<(u32, &BspFace)>> = Default::default();
 
         for i in model.first_face..model.first_face + model.num_faces {
             let face = &self.faces[i as usize];
             let tex_info = &self.tex_info[face.texture_info_idx as usize];
             let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
 
-            grouped_faces.entry(texture.header.name.as_str()).or_default().push((i, face));
+            grouped_faces.entry((texture.header.name.as_str(), tex_info.flags)).or_default().push((i, face));
         }
 
         let mut meshes = Vec::with_capacity(grouped_faces.len());
 
-        for (texture, faces) in grouped_faces {
+        for ((texture, tex_flags), faces) in grouped_faces {
             let mut mesh = ExportedMesh::default();
             mesh.texture = texture.to_string();
+            mesh.tex_flags = tex_flags;
 
             for (face_idx, face) in faces {
+                mesh.faces.push(face_idx);
+                
                 let plane = &self.planes[face.plane_idx as usize];
                 let tex_info = &self.tex_info[face.texture_info_idx as usize];
                 let texture_size = self.textures[tex_info.texture_idx as usize].as_ref()

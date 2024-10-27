@@ -45,7 +45,7 @@ macro_rules! impl_bsp_read_primitive {($ty:ty) => {
     }
 };}
 /// It would be nicer to do this with a proc macro, but i'd rather keep this to one crate if possible
-macro_rules! impl_bsp_read_simple {($ty:ty, $($field:ident),+ $(,)?) => {
+macro_rules! impl_bsp_parse_simple {($ty:ty, $($field:ident),+ $(,)?) => {
     impl BspParse for $ty {
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
             Ok(Self { $($field: reader.read().job(concat!("Reading field \"", stringify!($field), "\" on type ", stringify!($ty)))?),+ })
@@ -56,10 +56,10 @@ impl_bsp_read_primitive!(f32);
 impl_bsp_read_primitive!(u32);
 impl_bsp_read_primitive!(i32);
 
-impl_bsp_read_simple!(LumpEntry, offset, len);
-impl_bsp_read_simple!(LumpDirectory, entries);
+impl_bsp_parse_simple!(LumpEntry, offset, len);
+impl_bsp_parse_simple!(LumpDirectory, entries);
 
-impl_bsp_read_simple!(Vec3, x, y, z);
+impl_bsp_parse_simple!(Vec3, x, y, z);
 
 // We'd have to change this if we want to impl BspRead for u8
 impl<T: BspParse + std::fmt::Debug, const N: usize> BspParse for [T; N] {
@@ -118,7 +118,7 @@ pub struct BoundingBox {
     pub min: Vec3,
     pub max: Vec3,
 }
-impl_bsp_read_simple!(BoundingBox, min, max);
+impl_bsp_parse_simple!(BoundingBox, min, max);
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
@@ -128,7 +128,7 @@ pub struct BspEdge {
     /// The index to the second vertex this edge connects
     pub b: u32,
 }
-impl_bsp_read_simple!(BspEdge, a, b);
+impl_bsp_parse_simple!(BspEdge, a, b);
 
 #[derive(Debug, Clone)]
 #[repr(C)]
@@ -152,7 +152,7 @@ pub struct BspFace {
     /// Offset of the lightmap (in bytes) in the lightmap lump, or -1 if no lightmap
     pub lightmap_offset: i32,
 }
-impl_bsp_read_simple!(BspFace, plane_idx, plane_side, first_edge, num_edges, texture_info_idx, lightmap_styles, lightmap_offset);
+impl_bsp_parse_simple!(BspFace, plane_idx, plane_side, first_edge, num_edges, texture_info_idx, lightmap_styles, lightmap_offset);
 impl BspFace {
     /// The kind of lighting that should be applied to the face.
     /// - value 0 is the normal value, to be used with a light map.
@@ -181,9 +181,31 @@ pub struct BspTexInfo {
     pub v_offset: f32,
 
     pub texture_idx: u32,
-    pub flags: u32,
+    pub flags: BspTexFlags,
 }
-impl_bsp_read_simple!(BspTexInfo, u_axis, u_offset, v_axis, v_offset, texture_idx, flags);
+impl_bsp_parse_simple!(BspTexInfo, u_axis, u_offset, v_axis, v_offset, texture_idx, flags);
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum BspTexFlags {
+    /// Normal lightmapped surface.
+    #[default]
+    Normal,
+    /// No lighting or 256 subdivision.
+    Special,
+    /// Texture cannot be found.
+    Missing,
+}
+impl BspParse for BspTexFlags {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        match reader.read::<u32>()? {
+            0 => Ok(Self::Normal),
+            1 => Ok(Self::Special),
+            2 => Ok(Self::Missing),
+            n => Err(BspParseError::InvalidTexType(n)),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 #[repr(C)]
@@ -198,7 +220,7 @@ pub struct BspModel {
     pub first_face: u32,
     pub num_faces: u32,
 }
-impl_bsp_read_simple!(BspModel, bound, origin, head_node, visleafs, first_face, num_faces);
+impl_bsp_parse_simple!(BspModel, bound, origin, head_node, visleafs, first_face, num_faces);
 
 #[derive(Debug, Clone)]
 #[repr(C)]
@@ -208,7 +230,7 @@ pub struct BspPlane {
     /// Not really sure what this is, not used anywhere
     pub ty: u32,
 }
-impl_bsp_read_simple!(BspPlane, normal, dist, ty);
+impl_bsp_parse_simple!(BspPlane, normal, dist, ty);
 
 /// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
 pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspTexture>>> {
@@ -266,7 +288,7 @@ pub struct BspTextureHeader {
     #[allow(unused)] pub offset_quarter: u32,
     #[allow(unused)] pub offset_eighth: u32,
 }
-impl_bsp_read_simple!(BspTextureHeader, name, width, height, offset_full, offset_half, offset_quarter, offset_eighth);
+impl_bsp_parse_simple!(BspTextureHeader, name, width, height, offset_full, offset_half, offset_quarter, offset_eighth);
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.
 #[derive(Clone)]

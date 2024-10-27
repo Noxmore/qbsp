@@ -43,6 +43,8 @@ pub enum BspParseError {
     },
     #[error("Invalid color data, size {0} is not devisable by 3!")]
     ColorDataSizeNotDevisableBy3(usize),
+    #[error("Invalid texture type, expected 0, 1, or 2, found {0}.")]
+    InvalidTexType(u32),
 
     /// For telling the user exactly where the error occurred in the process.
     #[error("{0} - {1}")]
