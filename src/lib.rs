@@ -43,8 +43,8 @@ pub enum BspParseError {
     },
     #[error("Invalid color data, size {0} is not devisable by 3!")]
     ColorDataSizeNotDevisableBy3(usize),
-    #[error("Invalid texture type, expected 0, 1, or 2, found {0}.")]
-    InvalidTexType(u32),
+    #[error("Invalid value: {value}, acceptable:\n{acceptable}")]
+    InvalidVariant { value: i32, acceptable: &'static str },
 
     /// For telling the user exactly where the error occurred in the process.
     #[error("{0} - {1}")]
@@ -78,6 +78,34 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BspFormat {
+    /// Modern BSP format with expanded limits
+    BSP2,
+    /// Original quake format, in most cases, you should use BSP2 over this.
+    QBSP,
+}
+impl BspFormat {
+    pub fn from_magic_number(data: &[u8]) -> Self {
+        match data {
+            b"BSP2" => Self::BSP2,
+            _ => Self::QBSP,
+        }
+    }
+    
+    pub fn magic_number(&self) -> Option<&'static str> {
+        match self {
+            Self::BSP2 => Some("BSP2"),
+            Self::QBSP => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BspParseContext {
+    pub format: BspFormat,
+}
+
 /// An Id Tech 1 palette to use for embedded images.
 #[repr(C)] // Because we transmute data with QUAKE_PALETTE, don't want Rust to pull any shenanigans
 #[derive(Debug, Clone)]
@@ -100,30 +128,8 @@ impl Palette {
     }
 }
 
-/// The different lumps in the bsp file in order. Used as indexes into the lump entry directory.
-#[derive(Debug, Clone, Copy)]
-pub enum LumpSection {
-    Entities = 0,
-    Planes,
-    Textures,
-    Vertices,
-    Visibility,
-    Nodes,
-    TexInfo,
-    Faces,
-    Lighting,
-    ClipNodes,
-    Leafs,
-    MarkSurfaces,
-    Edges,
-    SurfEdges,
-    Models,
-}
-pub const LUMP_COUNT: usize = 15; // I don't want to bring in strum just for this
-
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(Debug, Clone, Copy)]
-#[repr(C)]
 pub struct LumpEntry {
     pub offset: u32,
     pub len: u32,
@@ -142,34 +148,39 @@ impl LumpEntry {
 }
 
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
-/// 
-/// NOTE: The amount of data to read is based on the memory size of `T`r
-pub fn read_lump<T: BspParse>(data: &[u8], lump_dir: &LumpDirectory, lump: LumpSection) -> BspResult<Vec<T>> {
-    let entry = lump_dir.get(lump);
+pub fn read_lump<T: BspParse>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
+    // let entry = lump_dir.get(lump);
     let lump_data = entry.get(data)?;
-    let lump_entries = entry.len as usize / mem::size_of::<T>();
+    let lump_entries = entry.len as usize / T::bsp_struct_size(ctx);
 
-    let mut reader = BspByteReader::new(lump_data);
+    let mut reader = BspByteReader::new(lump_data, ctx);
     let mut out = Vec::with_capacity(lump_entries);
 
     for i in 0..lump_entries {
-        out.push(reader.read().job(format!("Parsing lump \"{lump:?}\" entry {i}"))?);
+        out.push(reader.read().job(format!("Parsing {lump_name} lump entry {i}"))?);
     }
 
     Ok(out)
 }
 
 /// Contains the list of lump entries
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct LumpDirectory {
-    pub entries: [LumpEntry; LUMP_COUNT],
-}
-impl LumpDirectory {
-    /// Returns the entry of the specified lump in this directory.
-    #[inline]
-    pub fn get(&self, lump: LumpSection) -> LumpEntry {
-        self.entries[lump as usize]
-    }
+    pub entities: LumpEntry,
+    pub planes: LumpEntry,
+    pub textures: LumpEntry,
+    pub vertices: LumpEntry,
+    pub visibility: LumpEntry,
+    pub nodes: LumpEntry,
+    pub tex_info: LumpEntry,
+    pub faces: LumpEntry,
+    pub lighting: LumpEntry,
+    pub clip_nodes: LumpEntry,
+    pub leaves: LumpEntry,
+    pub mark_surfaces: LumpEntry,
+    pub edges: LumpEntry,
+    pub surf_edges: LumpEntry,
+    pub models: LumpEntry,
 }
 
 /// The data parsed from a BSP file.
@@ -187,6 +198,7 @@ pub struct BspData {
     pub faces: Vec<BspFace>,
     pub tex_info: Vec<BspTexInfo>,
     pub models: Vec<BspModel>,
+    pub nodes: Vec<BspNode>,
     pub textures: Vec<Option<BspTexture>>,
     pub lighting: Option<BspLighting>,
 }
@@ -194,11 +206,18 @@ impl BspData {
     /// Parses the data from BSP input.
     pub fn parse(input: BspParseInput) -> BspResult<Self> {
         let BspParseInput { bsp, lit } = input;
-        let mut reader = BspByteReader::new(bsp);
+        if bsp.len() < 4 {
+            return Err(BspParseError::BufferOutOfBounds { from: 0, to: 4, size: bsp.len() });
+        }
+        
+        let ctx = BspParseContext {
+            format: BspFormat::from_magic_number(&bsp[0..4]),
+        };
+        let mut reader = BspByteReader::new(bsp, &ctx);
 
-        let magic: [u8; 4] = reader.read()?;
-        if &magic != b"BSP2" {
-            return Err(BspParseError::WrongMagicNumber { found: magic, expected: "BSP2" });
+        
+        if ctx.format.magic_number().is_some() {
+            reader.read_bytes(4)?;
         }
         
         let lump_dir: LumpDirectory = reader.read()?;
@@ -206,27 +225,27 @@ impl BspData {
         // println!("entities lump size: {}", lump_dir.get(LumpSection::Entities).get(bsp)?.len());
         let data = Self {
             entities: std::str::from_utf8(
-                lump_dir.get(LumpSection::Entities)
+                lump_dir.entities
                     .get(bsp)?
                     // We split off the null byte here since this is a C string. TODO do we have to?
                     .split_last()
                     .map(|(_, v)| v)
                     .unwrap_or(&[])
             ).map_err(BspParseError::InvalidString).job("Reading entities lump")?.to_string(),
-            // entities: lump_dir.get(LumpSection::Entities).get(bsp)?.to_vec(),
-            vertices: read_lump(bsp, &lump_dir, LumpSection::Vertices)?,
-            planes: read_lump(bsp, &lump_dir, LumpSection::Planes)?,
-            edges: read_lump(bsp, &lump_dir, LumpSection::Edges)?,
-            surface_edges: read_lump(bsp, &lump_dir, LumpSection::SurfEdges)?,
-            faces: read_lump(bsp, &lump_dir, LumpSection::Faces)?,
-            tex_info: read_lump(bsp, &lump_dir, LumpSection::TexInfo)?,
-            models: read_lump(bsp, &lump_dir, LumpSection::Models)?,
-            textures: read_texture_lump(&mut BspByteReader::new(lump_dir.get(LumpSection::Textures).get(bsp)?)).job("Reading texture lump")?,
+            vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
+            planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
+            edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
+            surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
+            faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
+            tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
+            models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
+            nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
+            textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
             lighting: if let Some(lit) = lit {
-                Some(BspLighting::read_lit(lit).job("Parsing .lit file")?)
+                Some(BspLighting::read_lit(lit, &ctx).job("Parsing .lit file")?)
                 // TODO BSPX (DECOUPLED_LM && RGBLIGHTING)
             } else {
-                let lighting = lump_dir.get(LumpSection::Lighting).get(bsp)?;
+                let lighting = lump_dir.lighting.get(bsp)?;
 
                 if lighting.is_empty() {
                     None

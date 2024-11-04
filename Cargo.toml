@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 glam = "0.29"
-# grid = "0.15"
 image = "0.25"
 texture_packer = "0.29"
 thiserror = "1.0"

@@ -72,7 +72,7 @@ impl BspData {
 
         for i in model.first_face..model.first_face + model.num_faces {
             let face = &self.faces[i as usize];
-            let tex_info = &self.tex_info[face.texture_info_idx as usize];
+            let tex_info = &self.tex_info[face.texture_info_idx.value() as usize];
             let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
 
             grouped_faces.entry((texture.header.name.as_str(), tex_info.flags)).or_default().push((i, face));
@@ -88,26 +88,26 @@ impl BspData {
             for (face_idx, face) in faces {
                 mesh.faces.push(face_idx);
                 
-                let plane = &self.planes[face.plane_idx as usize];
-                let tex_info = &self.tex_info[face.texture_info_idx as usize];
+                let plane = &self.planes[face.plane_idx.value() as usize];
+                let tex_info = &self.tex_info[face.texture_info_idx.value() as usize];
                 let texture_size = self.textures[tex_info.texture_idx as usize].as_ref()
                     .map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
                     .unwrap_or(Vec2::ONE);
 
 
                 // The uv coordinates of the face's lightmap in the world, rather than on a lightmap atlas
-                let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges as usize);
+                let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.value() as usize);
 
                 let first_index = mesh.positions.len() as u32;
-                for i in face.first_edge..face.first_edge + face.num_edges {
+                for i in face.first_edge..face.first_edge + face.num_edges.value() {
                     let surf_edge = self.surface_edges[i as usize];
                     let edge = self.edges[surf_edge.abs() as usize];
                     let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
 
-                    let pos = self.vertices[vert_idx.0 as usize];
+                    let pos = self.vertices[vert_idx.0.value() as usize];
 
                     mesh.positions.push(pos);
-                    mesh.normals.push(if face.plane_side == 0 { plane.normal } else { -plane.normal });
+                    mesh.normals.push(if face.plane_side.value() == 0 { plane.normal } else { -plane.normal });
 
                     // Converting to double for calculation to minimise floating-point imprecision as demonstrated here: https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315
                     let uv = dvec2(
@@ -121,7 +121,7 @@ impl BspData {
                 }
 
                 // Calculate indices
-                for i in 1..face.num_edges - 1 {
+                for i in 1..face.num_edges.value() - 1 {
                     mesh.indices.push([0, i + 1, i].map(|x| first_index + x));
                 }
 
