@@ -2,4 +2,4 @@
 
 Work in progress Rust crate for parsing Id Tech 1 BSP files.
 
-Currently supports the QBSP and BSP2 formats.
+Currently supports the BSP29 and BSP2 formats.

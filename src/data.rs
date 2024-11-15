@@ -35,27 +35,29 @@ impl<'a> BspByteReader<'a> {
     }
 }
 
-// TODO Support other BSP versions, mainly BSP29
-
 /// Defines how a type should be read from a BSP file.
 pub trait BspParse: Sized {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
     fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
-#[inline]
-fn bsp_struct_size<T: BspParse>(_: &T, ctx: &BspParseContext) -> usize {
-    T::bsp_struct_size(ctx)
-}
 macro_rules! impl_bsp_read_primitive {($ty:ty) => {
     impl BspParse for $ty {
+        #[inline]
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
             Ok(<$ty>::from_le_bytes(reader.read()?))
         }
+        #[inline]
         fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
             mem::size_of::<$ty>()
         }
     }
 };}
+
+/// Used for [impl_bsp_parse_simple] to get the struct size of a field using type coercion.
+#[inline]
+fn bsp_struct_size<T: BspParse>(_: &T, ctx: &BspParseContext) -> usize {
+    T::bsp_struct_size(ctx)
+}
 /// It would be nicer to do this with a proc macro, but i'd rather keep this to one crate if possible
 macro_rules! impl_bsp_parse_simple {($ty:ty, $($field:ident),+ $(,)?) => {
     impl BspParse for $ty {
@@ -105,6 +107,7 @@ impl_bsp_read_primitive!(i32);
 impl_bsp_read_primitive!(f32);
 
 impl BspParse for u8 {
+    #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         reader.read_bytes(1).map(|bytes| bytes[0])
     }
@@ -123,6 +126,7 @@ impl_bsp_parse_simple!(U16Vec3, x, y, z);
 
 // We'd have to change this if we want to impl BspRead for u8
 impl<T: BspParse + std::fmt::Debug, const N: usize> BspParse for [T; N] {
+    #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         // Look ma, no heap allocations!
         let mut out = [(); N].map(|_| mem::MaybeUninit::uninit());
@@ -139,42 +143,45 @@ impl<T: BspParse + std::fmt::Debug, const N: usize> BspParse for [T; N] {
 
 /// A value in a BSP file where its size differs between formats.
 #[derive(Debug, Clone, Copy)]
-pub enum BspVariableValue<BSP2, QBSP> {
+pub enum BspVariableValue<BSP2, BSP29> {
     BSP2(BSP2),
-    QBSP(QBSP),
+    BSP29(BSP29),
 }
-impl<BSP2: BspParse, QBSP: BspParse> BspParse for BspVariableValue<BSP2, QBSP> {
+impl<BSP2: BspParse, BSP29: BspParse> BspParse for BspVariableValue<BSP2, BSP29> {
     #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         match reader.ctx.format {
             BspFormat::BSP2 => Ok(Self::BSP2(reader.read()?)),
-            BspFormat::QBSP => Ok(Self::QBSP(reader.read()?)),
+            BspFormat::BSP29 => Ok(Self::BSP29(reader.read()?)),
         }
     }
     #[inline]
     fn bsp_struct_size(ctx: &BspParseContext) -> usize {
         match ctx.format {
             BspFormat::BSP2 => mem::size_of::<BSP2>(),
-            BspFormat::QBSP => mem::size_of::<QBSP>(),
+            BspFormat::BSP29 => mem::size_of::<BSP29>(),
         }
     }
 }
-impl<BSP2, QBSP: Into<BSP2>> BspVariableValue<BSP2, QBSP> {
+impl<BSP2, BSP29: Into<BSP2>> BspVariableValue<BSP2, BSP29> {
+    /// Converts the value stored within into the value expected by the BSP2 format. This is the function you want to get the value out of this.
     #[inline]
-    pub fn value(self) -> BSP2 {
+    pub fn bsp2(self) -> BSP2 {
         match self {
             Self::BSP2(v) => v,
-            Self::QBSP(v) => v.into(),
+            Self::BSP29(v) => v.into(),
         }
     }
 }
 
+/// An unsigned variable integer parsed from a BSP. u32 when parsing BSP2, u16 when parsing BSP29.
 pub type UBspValue = BspVariableValue<u32, u16>;
+/// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
 pub type IBspValue = BspVariableValue<i32, i16>;
 
 
 /// Fixed-sized ascii string.
-#[derive(Clone)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct FixedStr<const N: usize> {
     data: [u8; N],
 }
@@ -232,6 +239,7 @@ impl From<ShortBoundingBox> for BoundingBox {
     }
 }
 
+/// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
 pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 
 #[derive(Debug, Clone, Copy)]
@@ -243,7 +251,104 @@ pub struct BspEdge {
 }
 impl_bsp_parse_simple!(BspEdge, a, b);
 
+/// Byte that dictates how a specific BSP lightmap appears:
+/// - 255 means there is no lightmap.
+/// - 0 means normal, unanimated lightmap.
+/// - 1 through 254 are programmer-defined animated styles, including togglable lights. In Quake though, 1 produces a fast pulsating light, and 2 produces a slow pulsating light, so those might be good defaults.
+/// 
+/// It is recommended to compare these values via the provided methods and constants of this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LightmapStyle(pub u8);
+impl LightmapStyle {
+    /// Unanimated lightmap.
+    pub const NORMAL: Self = Self(0);
+    /// No lightmap.
+    pub const NONE: Self = Self(u8::MAX);
+}
+impl BspParse for LightmapStyle {
+    #[inline]
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        reader.read().map(Self)
+    }
+    #[inline]
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        1
+    }
+}
+impl std::fmt::Display for LightmapStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            0 => write!(f, "0 (normal)"),
+            255 => write!(f, "255 (no lightmap)"),
+            n => n.fmt(f),
+        }
+    }
+}
+
+/// Container for mapping lightmap styles to lightmap images (either atlas' or standalone) to later composite together to achieve animated lightmaps.
+/// 
+/// This is just a wrapper for a HashMap that ensures that all containing images are the same size.
 #[derive(Debug, Clone)]
+pub struct Lightmaps {
+    size: UVec2,
+    map: HashMap<LightmapStyle, image::RgbImage>,
+}
+impl Lightmaps {
+    #[inline]
+    pub fn new(size: impl Into<UVec2>) -> Self {
+        Self { size: size.into(), map: HashMap::new() }
+    }
+
+    /// Constructs a Lightmaps collection with a single lightmap of the specified `size` filled with a single `color`.
+    pub fn new_single_color(size: impl Into<UVec2>, color: [u8; 3]) -> Self {
+        let size = size.into();
+        Self { size, map: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]) }
+    }
+
+    #[inline]
+    pub fn size(&self) -> UVec2 {
+        self.size
+    }
+    
+    #[inline]
+    pub fn map(&self) -> &HashMap<LightmapStyle, image::RgbImage> {
+        &self.map
+    }
+
+    /// Modifies the internal map, checking to ensure all images are the same size after.
+    pub fn modify_map<O, F: FnOnce(&mut HashMap<LightmapStyle, image::RgbImage>) -> O>(&mut self, modifier: F) -> Result<O, LightmapsInsertionError> {
+        let out = modifier(&mut self.map);
+
+        for (style, image) in &self.map {
+            let image_size = uvec2(image.width(), image.height());
+            if self.size != image_size {
+                return Err(LightmapsInsertionError { style: *style, image_size, expected_size: self.size });
+            }
+        }
+
+        Ok(out)
+    }
+
+    /// Inserts a new image into the collection. Returns `Err` if the atlas' size doesn't match the collection's expected size.
+    pub fn insert(&mut self, style: LightmapStyle, image: image::RgbImage) -> Result<Option<image::RgbImage>, LightmapsInsertionError> {
+        let image_size = uvec2(image.width(), image.height());
+        if self.size != image_size {
+            return Err(LightmapsInsertionError { style, image_size, expected_size: self.size });
+        }
+        
+        Ok(self.map.insert(style, image))
+    }
+}
+
+#[derive(Debug, Error)]
+#[error("Lightmap image of style {style} is size {image_size}, when the lightmap collection's expected size is {expected_size}")]
+pub struct LightmapsInsertionError {
+    pub style: LightmapStyle,
+    pub image_size: UVec2,
+    pub expected_size: UVec2,
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct BspFace {
     /// Index of the plane the face is parallel to
     pub plane_idx: UBspValue,
@@ -258,34 +363,19 @@ pub struct BspFace {
     /// Index of the texture info structure
     pub texture_info_idx: UBspValue,
 
-    /// Styles (bit flags) for the lightmaps
-    pub lightmap_styles: [u8; 4],
+    /// Each face can have up to 4 lightmaps, the additional 3 are positioned right after the lightmap at `lightmap_offset`.
+    /// 
+    /// Each element in this array is the style in which these lightmaps appear, see docs for [LightmapStyle].
+    /// 
+    /// You can also short-circuit when looping through these styles, if `lightmap_styles[2]` is 255, there isn't a possibility that `lightmap_styles[3]` isn't.
+    pub lightmap_styles: [LightmapStyle; 4],
 
     /// Offset of the lightmap (in bytes) in the lightmap lump, or -1 if no lightmap
     pub lightmap_offset: i32,
 }
 impl_bsp_parse_simple!(BspFace, plane_idx, plane_side, first_edge, num_edges, texture_info_idx, lightmap_styles, lightmap_offset);
-impl BspFace {
-    /// The kind of lighting that should be applied to the face.
-    /// - value 0 is the normal value, to be used with a light map.
-    /// - value 0xFF is to be used when there is no light map.
-    /// - value 1 produces a fast pulsating light
-    /// - value 2 produces a slow pulsating light
-    /// - value 3 to 10 produce various other lighting effects. (TODO implement these lighting effects somehow?)
-    #[inline]
-    pub fn light_type(&self) -> u8 {
-        self.lightmap_styles[0]
-    }
 
-    /// Gives the base light level for the face, that is the minimum light level for the light map, or the constant light level in the absence of light map.
-    /// Curiously, value 0xFF codes for minimum light, and value 0 codes for maximum light.
-    #[inline]
-    pub fn base_light(&self) -> u8 {
-        self.lightmap_styles[1]
-    }
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BspTexInfo {
     pub u_axis: Vec3,
     pub u_offset: f32,
@@ -332,7 +422,7 @@ impl BspParse for BspTexFlags {
     }
 } */
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BspModel {
     pub bound: BoundingBox,
     /// Origin of model, usually (0,0,0)
@@ -347,7 +437,7 @@ pub struct BspModel {
 }
 impl_bsp_parse_simple!(BspModel, bound, origin, head_node, visleafs, first_face, num_faces);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BspPlane {
     pub normal: Vec3,
     pub dist: f32,
@@ -373,7 +463,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
     Ok(textures)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BspNode {
     /// Index of the [BspPlane] that splits the node.
     pub plane_idx: u32,
@@ -409,7 +499,7 @@ bsp_parsed_unit_enum! {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct BspTreeLeaf {
     pub contents: BspTreeLeafContents,
     pub vis_list: u32,

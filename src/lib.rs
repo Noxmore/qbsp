@@ -83,20 +83,14 @@ pub enum BspFormat {
     /// Modern BSP format with expanded limits
     BSP2,
     /// Original quake format, in most cases, you should use BSP2 over this.
-    QBSP,
+    BSP29,
 }
 impl BspFormat {
-    pub fn from_magic_number(data: &[u8]) -> Self {
-        match data {
-            b"BSP2" => Self::BSP2,
-            _ => Self::QBSP,
-        }
-    }
-    
-    pub fn magic_number(&self) -> Option<&'static str> {
-        match self {
-            Self::BSP2 => Some("BSP2"),
-            Self::QBSP => None,
+    pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
+        match &data {
+            b"BSP2" => Ok(Self::BSP2),
+            [0x1D, 0x00, 0x00, 0x00] => Ok(Self::BSP29),
+            _ => Err(BspParseError::WrongMagicNumber { found: data, expected: "BSP2 or 0x1D for BSP29" }),
         }
     }
 }
@@ -211,18 +205,13 @@ impl BspData {
         }
         
         let ctx = BspParseContext {
-            format: BspFormat::from_magic_number(&bsp[0..4]),
+            format: BspFormat::from_magic_number(bsp[0..4].try_into().unwrap())?,
         };
-        let mut reader = BspByteReader::new(bsp, &ctx);
-
-        
-        if ctx.format.magic_number().is_some() {
-            reader.read_bytes(4)?;
-        }
+        let mut reader = BspByteReader::new(&bsp[4..], &ctx);
         
         let lump_dir: LumpDirectory = reader.read()?;
         
-        // println!("entities lump size: {}", lump_dir.get(LumpSection::Entities).get(bsp)?.len());
+        println!("entities lump size: {}", lump_dir.entities.get(bsp)?.len());
         let data = Self {
             entities: std::str::from_utf8(
                 lump_dir.entities

@@ -2,6 +2,7 @@
 
 use crate::*;
 
+use image::GenericImage;
 use texture_packer::{
     texture::Texture, TexturePacker, TexturePackerConfig
 };
@@ -49,8 +50,8 @@ pub struct ExportedMesh {
 
 pub struct MeshExportOutput {
     pub meshes: Vec<ExportedMesh>,
-    // TODO Lightmap animation?
-    pub lightmap_atlas: Option<image::RgbImage>,
+    /// Map of lightmap atlas' for each lightmap style, which you can then composite together to achieve animated lightmaps.
+    pub lightmap_atlas: Option<Lightmaps>,
 }
 
 impl BspData {
@@ -72,7 +73,7 @@ impl BspData {
 
         for i in model.first_face..model.first_face + model.num_faces {
             let face = &self.faces[i as usize];
-            let tex_info = &self.tex_info[face.texture_info_idx.value() as usize];
+            let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
             let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
 
             grouped_faces.entry((texture.header.name.as_str(), tex_info.flags)).or_default().push((i, face));
@@ -88,26 +89,26 @@ impl BspData {
             for (face_idx, face) in faces {
                 mesh.faces.push(face_idx);
                 
-                let plane = &self.planes[face.plane_idx.value() as usize];
-                let tex_info = &self.tex_info[face.texture_info_idx.value() as usize];
+                let plane = &self.planes[face.plane_idx.bsp2() as usize];
+                let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
                 let texture_size = self.textures[tex_info.texture_idx as usize].as_ref()
                     .map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
                     .unwrap_or(Vec2::ONE);
 
 
                 // The uv coordinates of the face's lightmap in the world, rather than on a lightmap atlas
-                let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.value() as usize);
+                let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.bsp2() as usize);
 
                 let first_index = mesh.positions.len() as u32;
-                for i in face.first_edge..face.first_edge + face.num_edges.value() {
+                for i in face.first_edge..face.first_edge + face.num_edges.bsp2() {
                     let surf_edge = self.surface_edges[i as usize];
                     let edge = self.edges[surf_edge.abs() as usize];
                     let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
 
-                    let pos = self.vertices[vert_idx.0.value() as usize];
+                    let pos = self.vertices[vert_idx.0.bsp2() as usize];
 
                     mesh.positions.push(pos);
-                    mesh.normals.push(if face.plane_side.value() == 0 { plane.normal } else { -plane.normal });
+                    mesh.normals.push(if face.plane_side.bsp2() == 0 { plane.normal } else { -plane.normal });
 
                     // Converting to double for calculation to minimise floating-point imprecision as demonstrated here: https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315
                     let uv = dvec2(
@@ -121,7 +122,7 @@ impl BspData {
                 }
 
                 // Calculate indices
-                for i in 1..face.num_edges.value() - 1 {
+                for i in 1..face.num_edges.bsp2() - 1 {
                     mesh.indices.push([0, i + 1, i].map(|x| first_index + x));
                 }
 
@@ -142,20 +143,34 @@ impl BspData {
                 let i_max = (world_lightmap_rect.max / 16.).ceil().as_ivec2();
                 let face_lightmap_size = (i_max - i_min).as_uvec2() + 1;
 
-                let lightmap_image = if face.lightmap_offset.is_negative() {
-                    image::RgbImage::from_pixel(face_lightmap_size.x, face_lightmap_size.y, image::Rgb([0; 3]))
+                // Stores in terms of pixels instead of bytes because we index into the lighting per pixel, even if it's stored in RGB.
+                let face_lightmap_pixels = face_lightmap_size.x * face_lightmap_size.y;
+
+                let lightmaps = if face.lightmap_offset.is_negative() || face.lightmap_styles[0] == LightmapStyle::NONE {
+                    // HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(face_lightmap_size.x, face_lightmap_size.y, image::Rgb([0; 3])))])
+                    Lightmaps::new_single_color(face_lightmap_size, [0; 3])
                 } else {
-                    image::RgbImage::from_fn(face_lightmap_size.x, face_lightmap_size.y, |x, y| {
-                        // if x == 0 && y == 0 { return image::Rgb([0, 255, 0]) } 
-                        image::Rgb(lighting.get(face.lightmap_offset as usize + (y * face_lightmap_size.x + x) as usize).unwrap_or_default())
-                        // let normal = ((if face.plane_side == 0 { plane.normal } else { -plane.normal }).normalize() * 255.).abs();
-                        // [normal.x as u8, normal.y as u8, normal.z as u8].into()
-                        // [255; 3].into()
-                    })
+                    let mut lightmaps = Lightmaps::new(face_lightmap_size);
+                    for (i, style) in face.lightmap_styles.into_iter().enumerate() {
+                        if style == LightmapStyle::NONE { break }
+                        lightmaps.insert(style, image::RgbImage::from_fn(face_lightmap_size.x, face_lightmap_size.y, |x, y| {
+                            // if face_idcx == 56 {
+                                image::Rgb(lighting.get(face.lightmap_offset as usize + (face_lightmap_pixels as usize * i) + (y * face_lightmap_size.x + x) as usize).unwrap_or_default())
+                            // } else {
+                                // image::Rgb([fastrand::u8(..), fastrand::u8(..), fastrand::u8(..)])
+                            // }
+                        })).unwrap();
+                    }
+                    lightmaps
                 };
-                let Some(frame) = lightmap_packer.pack(face_idx, lightmap_image) else {
-                    panic!("Failed to pack image of size {face_lightmap_size}");
+                let Some(frame) = lightmap_packer.pack(face_idx, lightmaps) else {
+                    // TODO Should this return Err() instead? 
+                    panic!("Failed to pack lightmap of size {face_lightmap_size}, {} lightmaps have already been packed.", lightmap_packer.images.len());
                 };
+                // println!("{frame:?}");
+                // if frame.max - frame.min == Vec2::ZERO {
+                //     println!("bad");
+                // }
                 
                 // Append lightmap uvs, since lightmap face size is calculated from the uvs bounds, we don't need to resize it, just move it into place
                 // Atlas uvs will be in texture space until converted later
@@ -178,19 +193,22 @@ impl BspData {
 
         // Finalize lightmap atlas
         let lightmap_atlas = if self.lighting.is_some() {
-            let image = lightmap_packer.export([0; 3]); // TODO make customizable
+            let atlas = lightmap_packer.export([0; 3]); // TODO make default color customizable
 
-            // Normalize lightmap UVs from texture space
-            let atlas_size = vec2(image.width() as f32, image.height() as f32);
-            for mesh in &mut meshes {
-                let Some(lightmap_uvs) = &mut mesh.lightmap_uvs else { continue };
-
-                for uv in lightmap_uvs {
-                    *uv /= atlas_size; // * 16
+            if atlas.size() == UVec2::ZERO {
+                None
+            } else {
+                // Normalize lightmap UVs from texture space
+                for mesh in &mut meshes {
+                    let Some(lightmap_uvs) = &mut mesh.lightmap_uvs else { continue };
+    
+                    for uv in lightmap_uvs {
+                        *uv /= atlas.size().as_vec2();
+                    }
                 }
+    
+                Some(atlas)
             }
-
-            Some(image)
         } else {
             None
         };
@@ -202,10 +220,10 @@ impl BspData {
     }
 }
 
-/// A trait for packing textures into a texture atlas. Specifically using image::RgbImage.
-trait AtlasPacker {
-    fn pack(&mut self, face_idx: u32, image: image::RgbImage) -> Option<Rect>;
-    fn export(&self, default: [u8; 3]) -> image::RgbImage;
+/// A trait for packing lightmaps into texture atlas'. Specifically using image::RgbImage.
+trait LightmapPacker {
+    fn pack(&mut self, face_idx: u32, images: Lightmaps) -> Option<Rect>;
+    fn export(&self, default: [u8; 3]) -> Lightmaps;
 }
 
 /// Currently, we use texture_packer to create atlas' and have to do
@@ -247,35 +265,45 @@ impl Texture for DummyTexture {
 struct DefaultLightmapPacker {
     packer: TexturePacker<'static, DummyTexture, u32>,
     // I have to store images separately, since TexturePacker doesn't give me access
-    images: Vec<(texture_packer::Frame<u32>, image::RgbImage)>,
+    images: Vec<(texture_packer::Frame<u32>, Lightmaps)>,
 }
 impl DefaultLightmapPacker {
     pub fn new(config: TexturePackerConfig) -> Self {
         Self { packer: TexturePacker::new_skyline(config), images: Vec::new() }
     }
 }
-impl AtlasPacker for DefaultLightmapPacker {
-    fn pack(&mut self, face_idx: u32, image: image::RgbImage) -> Option<Rect> {
-        self.packer.pack_own(face_idx, DummyTexture { width: image.width(), height: image.height() }).ok()?;
+impl LightmapPacker for DefaultLightmapPacker {
+    fn pack(&mut self, face_idx: u32, lightmaps: Lightmaps) -> Option<Rect> {
+        self.packer.pack_own(face_idx, DummyTexture { width: lightmaps.size().x, height: lightmaps.size().y }).ok()?;
         self.packer.get_frame(&face_idx).map(|frame| {
-            self.images.push((frame.clone(), image));
+            self.images.push((frame.clone(), lightmaps));
             let min = vec2(frame.frame.x as f32, frame.frame.y as f32);
             Rect { min, max: min + vec2(frame.frame.w as f32, frame.frame.h as f32) }
         })
     }
-    fn export(&self, default: [u8; 3]) -> image::RgbImage {
-        let mut image = image::RgbImage::from_pixel(self.packer.width(), self.packer.height(), image::Rgb(default));
-        for (frame, lightmap_image) in &self.images {
-            // let lightmap_image = &self.images[*face_idx as usize];
-            for x in 0..frame.frame.w {
-                for y in 0..frame.frame.h {
-                    if frame.frame.x + x >= image.width() || frame.frame.y + y >= image.height() || x >= lightmap_image.width() || y >= lightmap_image.height() {
-                        continue;
+    fn export(&self, default: [u8; 3]) -> Lightmaps {
+        let mut images = Lightmaps::new([self.packer.width(), self.packer.height()]);
+        let [atlas_width, atlas_height] = images.size().to_array();
+
+        for (frame, lightmap_images) in &self.images {
+            for (light_style, lightmap_image) in lightmap_images.map() {
+                images.modify_map(|map| {
+                    let atlas = map.entry(*light_style).or_insert_with(|| image::RgbImage::from_pixel(atlas_width, atlas_height, image::Rgb(default)));
+
+                    // image.copy_from(lightmap_image, frame.frame.x, frame.frame.y); // TODO ?
+                    for x in 0..frame.frame.w {
+                        for y in 0..frame.frame.h {
+                            // TODO ?? This should be impossible
+                            // if frame.frame.x + x >= atlas.width() || frame.frame.y + y >= atlas.height() || x >= lightmap_image.width() || y >= lightmap_image.height() {
+                            //     continue;
+                            // }
+                            *atlas.get_pixel_mut(frame.frame.x + x, frame.frame.y + y) = *lightmap_image.get_pixel(x, y);
+                        }
                     }
-                    *image.get_pixel_mut(frame.frame.x + x, frame.frame.y + y) = *lightmap_image.get_pixel(x, y);
-                }
+                }).unwrap();
             }
         }
-        image
+
+        images
     }
 }
