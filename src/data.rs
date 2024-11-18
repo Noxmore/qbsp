@@ -316,7 +316,7 @@ impl Lightmaps {
     }
 
     #[inline]
-    pub fn take_inner(self) -> HashMap<LightmapStyle, image::RgbImage> {
+    pub fn into_inner(self) -> HashMap<LightmapStyle, image::RgbImage> {
         self.inner
     }
 
