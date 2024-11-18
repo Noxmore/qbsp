@@ -195,6 +195,8 @@ pub struct BspData {
     pub nodes: Vec<BspNode>,
     pub textures: Vec<Option<BspTexture>>,
     pub lighting: Option<BspLighting>,
+
+    // TODO support BSPX
 }
 impl BspData {
     /// Parses the data from BSP input.

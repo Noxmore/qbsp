@@ -291,18 +291,18 @@ impl std::fmt::Display for LightmapStyle {
 #[derive(Debug, Clone)]
 pub struct Lightmaps {
     size: UVec2,
-    map: HashMap<LightmapStyle, image::RgbImage>,
+    inner: HashMap<LightmapStyle, image::RgbImage>,
 }
 impl Lightmaps {
     #[inline]
     pub fn new(size: impl Into<UVec2>) -> Self {
-        Self { size: size.into(), map: HashMap::new() }
+        Self { size: size.into(), inner: HashMap::new() }
     }
 
     /// Constructs a Lightmaps collection with a single lightmap of the specified `size` filled with a single `color`.
     pub fn new_single_color(size: impl Into<UVec2>, color: [u8; 3]) -> Self {
         let size = size.into();
-        Self { size, map: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]) }
+        Self { size, inner: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]) }
     }
 
     #[inline]
@@ -311,15 +311,20 @@ impl Lightmaps {
     }
     
     #[inline]
-    pub fn map(&self) -> &HashMap<LightmapStyle, image::RgbImage> {
-        &self.map
+    pub fn inner(&self) -> &HashMap<LightmapStyle, image::RgbImage> {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn take_inner(self) -> HashMap<LightmapStyle, image::RgbImage> {
+        self.inner
     }
 
     /// Modifies the internal map, checking to ensure all images are the same size after.
-    pub fn modify_map<O, F: FnOnce(&mut HashMap<LightmapStyle, image::RgbImage>) -> O>(&mut self, modifier: F) -> Result<O, LightmapsInsertionError> {
-        let out = modifier(&mut self.map);
+    pub fn modify_inner<O, F: FnOnce(&mut HashMap<LightmapStyle, image::RgbImage>) -> O>(&mut self, modifier: F) -> Result<O, LightmapsInsertionError> {
+        let out = modifier(&mut self.inner);
 
-        for (style, image) in &self.map {
+        for (style, image) in &self.inner {
             let image_size = uvec2(image.width(), image.height());
             if self.size != image_size {
                 return Err(LightmapsInsertionError { style: *style, image_size, expected_size: self.size });
@@ -336,7 +341,7 @@ impl Lightmaps {
             return Err(LightmapsInsertionError { style, image_size, expected_size: self.size });
         }
         
-        Ok(self.map.insert(style, image))
+        Ok(self.inner.insert(style, image))
     }
 }
 

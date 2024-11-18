@@ -286,8 +286,8 @@ impl LightmapPacker for DefaultLightmapPacker {
         let [atlas_width, atlas_height] = images.size().to_array();
 
         for (frame, lightmap_images) in &self.images {
-            for (light_style, lightmap_image) in lightmap_images.map() {
-                images.modify_map(|map| {
+            for (light_style, lightmap_image) in lightmap_images.inner() {
+                images.modify_inner(|map| {
                     let atlas = map.entry(*light_style).or_insert_with(|| image::RgbImage::from_pixel(atlas_width, atlas_height, image::Rgb(default)));
 
                     // image.copy_from(lightmap_image, frame.frame.x, frame.frame.y); // TODO ?
