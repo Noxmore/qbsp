@@ -14,6 +14,6 @@ pub use crate::{
 
     mesh::{
         ExportedMesh,
-        MeshExportOutput,
+        MeshModelOutput,
     }
 };

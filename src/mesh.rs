@@ -48,7 +48,7 @@ pub struct ExportedMesh {
     pub texture: String,
 }
 
-pub struct MeshExportOutput {
+pub struct MeshModelOutput {
     pub meshes: Vec<ExportedMesh>,
     /// Map of lightmap atlas' for each lightmap style, which you can then composite together to achieve animated lightmaps.
     pub lightmap_atlas: Option<Lightmaps>,
@@ -56,7 +56,7 @@ pub struct MeshExportOutput {
 
 impl BspData {
     /// Meshes a model at the specified index. Returns one mesh for each texture used in the model.
-    pub fn mesh_model(&self, model_idx: usize) -> MeshExportOutput {
+    pub fn mesh_model(&self, model_idx: usize) -> MeshModelOutput {
         let model = &self.models[model_idx];
 
         let mut lightmap_packer = DefaultLightmapPacker::new(TexturePackerConfig {
@@ -213,7 +213,7 @@ impl BspData {
             None
         };
         
-        MeshExportOutput {
+        MeshModelOutput {
             meshes,
             lightmap_atlas,
         }
