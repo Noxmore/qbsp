@@ -45,6 +45,9 @@ pub enum ComputeLightmapAtlasError {
 }
 
 impl BspData {
+    // TODO I would like this to be more powerful, being able to change things like where meshes split and such would be nice, but i can't think of a good API for it.
+    //      Also, support vis data.
+
     /// Packs every face's lightmap together onto a single atlas for GPU rendering.
     pub fn compute_lightmap_atlas(&self, default_lightmap_color: [u8; 3]) -> Result<LightmapAtlas, ComputeLightmapAtlasError> {
         let Some(lighting) = &self.lighting else { return Err(ComputeLightmapAtlasError::NoLightmaps) };
