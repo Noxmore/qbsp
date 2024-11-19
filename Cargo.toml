@@ -6,5 +6,6 @@ edition = "2021"
 [dependencies]
 glam = "0.29"
 image = "0.25"
+smallvec = "1"
 texture_packer = "0.29"
 thiserror = "2.0"

@@ -11,6 +11,7 @@ pub mod util;
 // Re-exports
 pub use glam;
 pub use image;
+pub use smallvec;
 
 /// The default quake palette.
 pub static QUAKE_PALETTE: Palette = unsafe { mem::transmute_copy(include_bytes!("../palette.lmp")) };
@@ -213,7 +214,8 @@ impl BspData {
         
         let lump_dir: LumpDirectory = reader.read()?;
         
-        println!("entities lump size: {}", lump_dir.entities.get(bsp)?.len());
+        // TODO entities lump sometimes being weird, preventing maps from loading
+        // println!("entities lump size: {}", lump_dir.entities.get(bsp)?.len());
         let data = Self {
             entities: std::str::from_utf8(
                 lump_dir.entities

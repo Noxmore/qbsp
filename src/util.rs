@@ -1,12 +1,25 @@
 use crate::*;
 
-// Simple rectangle type partially copied from Bevy.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Rect {
-    pub min: Vec2,
-    pub max: Vec2,
+// Simple generic rectangle type.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Rect<T> {
+    pub min: T,
+    pub max: T,
 }
-impl Rect {
+impl<T> Rect<T> {
+    pub const fn new(min: T, max: T) -> Self {
+        Self { min, max }
+    }
+}
+
+impl<T: std::ops::Sub<Output = T>> Rect<T> {
+    #[inline]
+    pub fn size(self) -> T {
+        self.max - self.min
+    }
+}
+
+impl Rect<Vec2> {
     pub const EMPTY: Self = Self {
         max: Vec2::NEG_INFINITY,
         min: Vec2::INFINITY,

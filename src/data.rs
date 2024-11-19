@@ -285,73 +285,6 @@ impl std::fmt::Display for LightmapStyle {
     }
 }
 
-/// Container for mapping lightmap styles to lightmap images (either atlas' or standalone) to later composite together to achieve animated lightmaps.
-/// 
-/// This is just a wrapper for a HashMap that ensures that all containing images are the same size.
-#[derive(Debug, Clone)]
-pub struct Lightmaps {
-    size: UVec2,
-    inner: HashMap<LightmapStyle, image::RgbImage>,
-}
-impl Lightmaps {
-    #[inline]
-    pub fn new(size: impl Into<UVec2>) -> Self {
-        Self { size: size.into(), inner: HashMap::new() }
-    }
-
-    /// Constructs a Lightmaps collection with a single lightmap of the specified `size` filled with a single `color`.
-    pub fn new_single_color(size: impl Into<UVec2>, color: [u8; 3]) -> Self {
-        let size = size.into();
-        Self { size, inner: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]) }
-    }
-
-    #[inline]
-    pub fn size(&self) -> UVec2 {
-        self.size
-    }
-    
-    #[inline]
-    pub fn inner(&self) -> &HashMap<LightmapStyle, image::RgbImage> {
-        &self.inner
-    }
-
-    #[inline]
-    pub fn into_inner(self) -> HashMap<LightmapStyle, image::RgbImage> {
-        self.inner
-    }
-
-    /// Modifies the internal map, checking to ensure all images are the same size after.
-    pub fn modify_inner<O, F: FnOnce(&mut HashMap<LightmapStyle, image::RgbImage>) -> O>(&mut self, modifier: F) -> Result<O, LightmapsInsertionError> {
-        let out = modifier(&mut self.inner);
-
-        for (style, image) in &self.inner {
-            let image_size = uvec2(image.width(), image.height());
-            if self.size != image_size {
-                return Err(LightmapsInsertionError { style: *style, image_size, expected_size: self.size });
-            }
-        }
-
-        Ok(out)
-    }
-
-    /// Inserts a new image into the collection. Returns `Err` if the atlas' size doesn't match the collection's expected size.
-    pub fn insert(&mut self, style: LightmapStyle, image: image::RgbImage) -> Result<Option<image::RgbImage>, LightmapsInsertionError> {
-        let image_size = uvec2(image.width(), image.height());
-        if self.size != image_size {
-            return Err(LightmapsInsertionError { style, image_size, expected_size: self.size });
-        }
-        
-        Ok(self.inner.insert(style, image))
-    }
-}
-
-#[derive(Debug, Error)]
-#[error("Lightmap image of style {style} is size {image_size}, when the lightmap collection's expected size is {expected_size}")]
-pub struct LightmapsInsertionError {
-    pub style: LightmapStyle,
-    pub image_size: UVec2,
-    pub expected_size: UVec2,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct BspFace {
@@ -380,6 +313,20 @@ pub struct BspFace {
 }
 impl_bsp_parse_simple!(BspFace, plane_idx, plane_side, first_edge, num_edges, texture_info_idx, lightmap_styles, lightmap_offset);
 
+impl BspFace {
+    /// Returns an iterator that retrieves the vertex positions that make up this face from `bsp`.
+    #[inline]
+    pub fn vertices<'a>(&self, bsp: &'a BspData) -> impl Iterator<Item = Vec3> + 'a {
+        (self.first_edge..self.first_edge + self.num_edges.bsp2()).map(|i| {
+            let surf_edge = bsp.surface_edges[i as usize];
+            let edge = bsp.edges[surf_edge.abs() as usize];
+            let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
+
+            bsp.vertices[vert_idx.0.bsp2() as usize]
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct BspTexInfo {
     pub u_axis: Vec3,
@@ -405,27 +352,6 @@ bsp_parsed_unit_enum! {
         Missing = 2,
     }
 }
-
-/* #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-#[repr(u32)]
-pub enum BspTexFlags {
-    /// Normal lightmapped surface.
-    #[default]
-    Normal = 0,
-    /// No lighting or 256 subdivision.
-    Special = 1,
-    /// Texture cannot be found.
-    Missing = 2,
-}
-impl BspParse for BspTexFlags {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        Self::try_from(reader.read::<u32>()?)
-            .map_err(|err| BspParseError::InvalidVariant(err.number))
-    }
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        mem::size_of::<u32>()
-    }
-} */
 
 #[derive(Debug, Clone, Copy)]
 pub struct BspModel {
@@ -591,6 +517,7 @@ impl BspLighting {
     }
 
     /// Convince function to get a location as an RGB color.
+    #[inline]
     pub fn get(&self, i: usize) -> Option<[u8; 3]> {
         match self {
             Self::White(v) => {

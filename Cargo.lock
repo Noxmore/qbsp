@@ -587,6 +587,7 @@ version = "0.1.0"
 dependencies = [
  "glam",
  "image",
+ "smallvec",
  "texture_packer",
  "thiserror 2.0.3",
 ]
