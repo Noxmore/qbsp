@@ -5,7 +5,11 @@ edition = "2021"
 
 [dependencies]
 glam = "0.29"
-image = "0.25"
+image = { version = "0.25", default-features = false }
 smallvec = "1"
-texture_packer = "0.29"
+texture_packer = { version = "0.29", optional = true }
 thiserror = "2.0"
+
+[features]
+default = [ "meshing" ]
+meshing = [ "dep:texture_packer" ]

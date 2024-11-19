@@ -4,6 +4,7 @@ pub(crate) use prelude::*;
 pub mod data;
 pub(crate) use data::*;
 
+#[cfg(feature = "meshing")]
 pub mod mesh;
 
 pub mod util;
