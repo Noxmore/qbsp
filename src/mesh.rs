@@ -33,6 +33,22 @@ pub struct MeshModelOutput {
     pub meshes: Vec<ExportedMesh>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ComputeLightmapSettings {
+    pub default_color: [u8; 3],
+    pub max_width: u32,
+    pub max_height: u32,
+}
+impl Default for ComputeLightmapSettings {
+    fn default() -> Self {
+        Self {
+            default_color: [0; 3],
+            max_width: 1024,
+            max_height: u32::MAX,
+        }
+    }
+}
+
 #[derive(Error, Debug, Clone)]
 pub enum ComputeLightmapAtlasError {
     #[error("Failed to pack lightmap of size {lightmap_size}, {images_packed} lightmaps have already been packed")]
@@ -49,11 +65,12 @@ impl BspData {
     //      Also, support vis data.
 
     /// Packs every face's lightmap together onto a single atlas for GPU rendering.
-    pub fn compute_lightmap_atlas(&self, default_lightmap_color: [u8; 3]) -> Result<LightmapAtlas, ComputeLightmapAtlasError> {
+    pub fn compute_lightmap_atlas(&self, settings: ComputeLightmapSettings) -> Result<LightmapAtlas, ComputeLightmapAtlasError> {
         let Some(lighting) = &self.lighting else { return Err(ComputeLightmapAtlasError::NoLightmaps) };
 
         let mut lightmap_packer = DefaultLightmapPacker::new(TexturePackerConfig {
-            max_height: u32::MAX,
+            max_width: settings.max_width,
+            max_height: settings.max_height,
             // Sizes are consistent enough that i don't think we need to support rotation
             allow_rotation: false,
             force_max_dimensions: false,
@@ -77,7 +94,7 @@ impl BspData {
             lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, frame.min.as_vec2()).collect());
         }
 
-        let atlas = lightmap_packer.export(default_lightmap_color);
+        let atlas = lightmap_packer.export(settings.default_color);
 
         // Normalize lightmap UVs from texture space
         for (_, uvs) in &mut lightmap_uvs {

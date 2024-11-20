@@ -15,4 +15,7 @@ pub use crate::{
 };
 
 #[cfg(feature = "meshing")]
-pub use crate::mesh::ExportedMesh;
+pub use crate::mesh::{
+    ExportedMesh,
+    ComputeLightmapSettings,
+};
