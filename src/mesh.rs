@@ -43,7 +43,7 @@ impl Default for ComputeLightmapSettings {
     fn default() -> Self {
         Self {
             default_color: [0; 3],
-            max_width: 1024,
+            max_width: 2048,
             max_height: u32::MAX,
         }
     }
