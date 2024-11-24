@@ -44,7 +44,7 @@ macro_rules! impl_bsp_read_primitive {($ty:ty) => {
     impl BspParse for $ty {
         #[inline]
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-            Ok(<$ty>::from_le_bytes(reader.read()?))
+            Ok(<$ty>::from_le_bytes(reader.read_bytes(mem::size_of::<$ty>())?.try_into().unwrap()))
         }
         #[inline]
         fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
@@ -187,7 +187,8 @@ pub struct FixedStr<const N: usize> {
 }
 impl<const N: usize> BspParse for FixedStr<N> {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        Self::new(reader.read()?).map_err(BspParseError::InvalidString)
+        let data = reader.read()?;
+        Self::new(data).map_err(BspParseError::map_utf8_error(&data))
     }
     #[inline]
     fn bsp_struct_size(_ctx: &BspParseContext) -> usize {

@@ -36,8 +36,11 @@ pub enum BspParseError {
         to: usize,
         size: usize,
     },
-    #[error("Failed to parse string: {0}")]
-    InvalidString(std::str::Utf8Error),
+    #[error("Failed to parse string at index {index}, invalid utf-8 sequence: {sequence:?}")]
+    InvalidString {
+        index: usize,
+        sequence: Vec<u8>,
+    },
     #[error("Wrong magic number! Expected {expected}, found \"{}\"", display_magic_number(found))]
     WrongMagicNumber {
         found: [u8; 4],
@@ -62,6 +65,11 @@ impl BspParseError {
                 _ => return err,
             }
         }
+    }
+
+    #[inline]
+    pub fn map_utf8_error<'a>(data: &'a [u8]) -> impl FnOnce(std::str::Utf8Error) -> Self + 'a {
+        |err| BspParseError::InvalidString { index: err.valid_up_to(), sequence: data[err.valid_up_to()..err.valid_up_to() + err.error_len().unwrap_or(1)].to_vec() }
     }
 }
 
@@ -215,17 +223,20 @@ impl BspData {
         
         let lump_dir: LumpDirectory = reader.read()?;
         
-        // TODO entities lump sometimes being weird, preventing maps from loading
-        // println!("entities lump size: {}", lump_dir.entities.get(bsp)?.len());
+        let mut entities_bytes = lump_dir.entities.get(bsp)?.to_vec();
+        for (i, byte) in entities_bytes.iter_mut().enumerate() {
+            if *byte > 127 {
+                // For some reason some characters in the entities lump are offset to the second half of byte values, no idea why.
+                *byte -= 128;
+            } else if *byte == 0 {
+                // Also, sometimes the entity lump ends early, so this just truncates it if that is the case.
+                entities_bytes.truncate(i);
+                break;
+            }
+        }
+        
         let data = Self {
-            entities: std::str::from_utf8(
-                lump_dir.entities
-                    .get(bsp)?
-                    // We split off the null byte here since this is a C string. TODO do we have to?
-                    .split_last()
-                    .map(|(_, v)| v)
-                    .unwrap_or(&[])
-            ).map_err(BspParseError::InvalidString).job("Reading entities lump")?.to_string(),
+            entities: std::str::from_utf8(&entities_bytes).map_err(BspParseError::map_utf8_error(&entities_bytes)).job("Reading entities lump")?.to_string(),
             vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
             planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
             edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
