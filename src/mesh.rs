@@ -51,10 +51,11 @@ impl Default for ComputeLightmapSettings {
 
 #[derive(Error, Debug, Clone)]
 pub enum ComputeLightmapAtlasError {
-    #[error("Failed to pack lightmap of size {lightmap_size}, {images_packed} lightmaps have already been packed")]
+    #[error("Failed to pack lightmap of size {lightmap_size}, {images_packed} lightmaps have already been packed. Max atlas size: {max_lightmap_size}")]
     PackFailure {
         lightmap_size: UVec2,
         images_packed: usize,
+        max_lightmap_size: UVec2,
     },
     #[error("No lightmaps")]
     NoLightmaps,
@@ -89,7 +90,11 @@ impl BspData {
             let lightmaps = read_lightmaps_from_face(face, &extents, lighting);
 
             let frame = lightmap_packer.pack(face, lightmaps)
-                .ok_or_else(|| ComputeLightmapAtlasError::PackFailure { lightmap_size: extents.lightmap_size(), images_packed: lightmap_packer.images.len() })?;
+                .ok_or_else(|| ComputeLightmapAtlasError::PackFailure {
+                    lightmap_size: extents.lightmap_size(),
+                    images_packed: lightmap_packer.images.len(),
+                    max_lightmap_size: uvec2(settings.max_width, settings.max_height),
+                })?;
             
             lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, frame.min.as_vec2()).collect());
         }
