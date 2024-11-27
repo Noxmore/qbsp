@@ -71,7 +71,7 @@ impl BspData {
                             }
                         };
 
-                        lightmap_uvs.insert(face_idx as u32, smallvec![none_lightmap_pos.as_vec2(); face.num_edges.bsp2() as usize]);
+                        lightmap_uvs.insert(face_idx as u32, smallvec![none_lightmap_pos.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize]);
                         continue;
                     }
                     
@@ -106,7 +106,7 @@ impl BspData {
                             }
                         };
 
-                        lightmap_uvs.insert(face_idx as u32, smallvec![none_lightmap_pos.as_vec2(); face.num_edges.bsp2() as usize]);
+                        lightmap_uvs.insert(face_idx as u32, smallvec![none_lightmap_pos.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize]);
                         continue;
                     }
                     
