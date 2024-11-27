@@ -17,8 +17,10 @@ pub use crate::{
 #[cfg(feature = "meshing")]
 pub use crate::mesh::{
     ExportedMesh,
-    ComputeLightmapSettings,
-    LightmapAtlasData,
-    LightmapAtlasType,
-    LightmapUvMap,
+    lighting::{
+        ComputeLightmapSettings,
+        LightmapAtlasData,
+        LightmapAtlasType,
+        LightmapUvMap,
+    },
 };
