@@ -154,7 +154,7 @@ pub fn read_lump<T: BspParse>(data: &[u8], entry: LumpEntry, lump_name: &'static
     Ok(out)
 }
 
-/// The data parsed from a BSP file.
+/// A BSP files contents parsed into structures for easy access.
 #[derive(Debug, Clone)]
 pub struct BspData {
     /// Essentially an embedded .map file, the differences being:
