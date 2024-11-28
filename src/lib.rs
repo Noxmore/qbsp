@@ -2,7 +2,7 @@ pub mod prelude;
 pub(crate) use prelude::*;
 
 pub mod data;
-pub(crate) use data::*;
+pub(crate) use data::{*, bsp::*, bspx::*};
 
 #[cfg(feature = "meshing")]
 pub mod mesh;
@@ -50,6 +50,11 @@ pub enum BspParseError {
     ColorDataSizeNotDevisableBy3(usize),
     #[error("Invalid value: {value}, acceptable:\n{acceptable}")]
     InvalidVariant { value: i32, acceptable: &'static str },
+    /// This is to be gracefully handled in-crate.
+    #[error("No BSPX directory")]
+    NoBspxDirectory,
+    #[error("No BSPX lump: {0}")]
+    NoBspxLump(String),
 
     /// For telling the user exactly where the error occurred in the process.
     #[error("{0} - {1}")]
@@ -80,6 +85,7 @@ pub trait BspParseResultDoingJobExt {
     fn job(self, job: impl ToString) -> Self;
 }
 impl<T> BspParseResultDoingJobExt for BspResult<T> {
+    #[inline]
     fn job(self, job: impl ToString) -> Self {
         match self {
             Ok(v) => Ok(v),
@@ -132,25 +138,6 @@ impl Palette {
     }
 }
 
-/// Points to the chunk of data in the file a lump resides in.
-#[derive(Debug, Clone, Copy)]
-pub struct LumpEntry {
-    pub offset: u32,
-    pub len: u32,
-}
-// BspRead implemented in lump_data
-impl LumpEntry {
-    /// Returns the slice of `data` (BSP file input) that this entry points to.
-    pub fn get<'a>(&self, data: &'a [u8]) -> BspResult<&'a [u8]> {
-        let (from, to) = (self.offset as usize, self.offset as usize + self.len as usize);
-        if to > data.len() {
-            Err(BspParseError::LumpOutOfBounds(*self))
-        } else {
-            Ok(&data[from..to])
-        }
-    }
-}
-
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
 pub fn read_lump<T: BspParse>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
     // let entry = lump_dir.get(lump);
@@ -165,26 +152,6 @@ pub fn read_lump<T: BspParse>(data: &[u8], entry: LumpEntry, lump_name: &'static
     }
 
     Ok(out)
-}
-
-/// Contains the list of lump entries
-#[derive(Debug, Clone, Copy)]
-pub struct LumpDirectory {
-    pub entities: LumpEntry,
-    pub planes: LumpEntry,
-    pub textures: LumpEntry,
-    pub vertices: LumpEntry,
-    pub visibility: LumpEntry,
-    pub nodes: LumpEntry,
-    pub tex_info: LumpEntry,
-    pub faces: LumpEntry,
-    pub lighting: LumpEntry,
-    pub clip_nodes: LumpEntry,
-    pub leaves: LumpEntry,
-    pub mark_surfaces: LumpEntry,
-    pub edges: LumpEntry,
-    pub surf_edges: LumpEntry,
-    pub models: LumpEntry,
 }
 
 /// The data parsed from a BSP file.
@@ -206,7 +173,7 @@ pub struct BspData {
     pub textures: Vec<Option<BspTexture>>,
     pub lighting: Option<BspLighting>,
 
-    // TODO support BSPX
+    pub bspx: BspxData,
 }
 impl BspData {
     /// Parses the data from BSP input.
@@ -222,6 +189,7 @@ impl BspData {
         let mut reader = BspByteReader::new(&bsp[4..], &ctx);
         
         let lump_dir: LumpDirectory = reader.read()?;
+        println!("{lump_dir:#?}");
         
         let mut entities_bytes = lump_dir.entities.get(bsp)?.to_vec();
         for (i, byte) in entities_bytes.iter_mut().enumerate() {
@@ -234,6 +202,8 @@ impl BspData {
                 break;
             }
         }
+
+        let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
         
         let data = Self {
             entities: std::str::from_utf8(&entities_bytes).map_err(BspParseError::map_utf8_error(&entities_bytes)).job("Reading entities lump")?.to_string(),
@@ -247,8 +217,9 @@ impl BspData {
             nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
             textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
             lighting: if let Some(lit) = lit {
-                Some(BspLighting::read_lit(lit, &ctx).job("Parsing .lit file")?)
-                // TODO BSPX (DECOUPLED_LM && RGBLIGHTING)
+                Some(BspLighting::read_lit(lit, &ctx, false).job("Parsing .lit file")?)
+            } else if let Some(lighting) = bspx.parse_rgb_lighting(&ctx) {
+                Some(lighting?)
             } else {
                 let lighting = lump_dir.lighting.get(bsp)?;
 
@@ -258,6 +229,8 @@ impl BspData {
                     Some(BspLighting::White(lighting.to_vec()))
                 }
             },
+
+            bspx,
         };
 
         Ok(data)

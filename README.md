@@ -8,4 +8,3 @@ Currently supports the BSP29 and BSP2 formats.
 - More flexible meshing API
 - Unit testing
 - BSP writing
-- BSPX support

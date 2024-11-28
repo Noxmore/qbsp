@@ -40,5 +40,5 @@ impl Rect<Vec2> {
 
 /// Displays bytes in string form if they make up a string, else just displays them as bytes.
 pub(crate) fn display_magic_number(bytes: &[u8]) -> String {
-    std::str::from_utf8(bytes).map(str::to_owned).unwrap_or(format!("{bytes:?}"))
+    std::str::from_utf8(bytes).ok().and_then(|s| s.is_ascii().then_some(s)).map(str::to_owned).unwrap_or(format!("{bytes:?}"))
 }
