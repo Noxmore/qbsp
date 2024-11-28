@@ -161,17 +161,21 @@ pub struct BspData {
     /// - Brush data has been stripped.
     /// - Brush entities have a `model` property indexing into the `models` field of this struct.
     pub entities: String,
+    pub planes: Vec<BspPlane>,
+    pub textures: Vec<Option<BspTexture>>,
     /// All vertex positions.
     pub vertices: Vec<Vec3>,
-    pub planes: Vec<BspPlane>,
+    // TODO visibility
+    pub nodes: Vec<BspNode>,
+    pub tex_info: Vec<BspTexInfo>,
+    pub faces: Vec<BspFace>,
+    pub lighting: Option<BspLighting>,
+    // TODO clip_nodes
+    // TODO leaves
+    // TODO mark_surfaces
     pub edges: Vec<BspEdge>,
     pub surface_edges: Vec<i32>,
-    pub faces: Vec<BspFace>,
-    pub tex_info: Vec<BspTexInfo>,
     pub models: Vec<BspModel>,
-    pub nodes: Vec<BspNode>,
-    pub textures: Vec<Option<BspTexture>>,
-    pub lighting: Option<BspLighting>,
 
     pub bspx: BspxData,
 }
