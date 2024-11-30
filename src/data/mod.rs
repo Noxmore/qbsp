@@ -127,6 +127,8 @@ impl BspParse for u8 {
 }
 
 impl_bsp_parse_simple!(Vec3, x, y, z);
+impl_bsp_parse_simple!(IVec3, x, y, z);
+impl_bsp_parse_simple!(UVec3, x, y, z);
 impl_bsp_parse_simple!(U16Vec3, x, y, z);
 
 // We'd have to change this if we want to impl BspRead for u8

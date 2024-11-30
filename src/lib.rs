@@ -94,9 +94,10 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BspFormat {
     /// Modern BSP format with expanded limits
+    #[default]
     BSP2,
     /// Original quake format, in most cases, you should use BSP2 over this.
     BSP29,
@@ -111,7 +112,7 @@ impl BspFormat {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BspParseContext {
     pub format: BspFormat,
 }
@@ -178,6 +179,9 @@ pub struct BspData {
     pub models: Vec<BspModel>,
 
     pub bspx: BspxData,
+
+    /// Additional information from the BSP parsed. For example, contains the [BspFormat] of the file.
+    pub parse_ctx: BspParseContext,
 }
 impl BspData {
     /// Parses the data from BSP input.
@@ -193,7 +197,6 @@ impl BspData {
         let mut reader = BspByteReader::new(&bsp[4..], &ctx);
         
         let lump_dir: LumpDirectory = reader.read()?;
-        println!("{lump_dir:#?}");
         
         let mut entities_bytes = lump_dir.entities.get(bsp)?.to_vec();
         for (i, byte) in entities_bytes.iter_mut().enumerate() {
@@ -235,6 +238,8 @@ impl BspData {
             },
 
             bspx,
+
+            parse_ctx: ctx,
         };
 
         Ok(data)

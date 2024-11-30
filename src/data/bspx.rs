@@ -70,8 +70,178 @@ impl BspxData {
         self.inner.get(&FixedStr::from_str(s)?).map(|v| &**v)
     }
 
-    /// Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+    /// Parses the `RGBLIGHTING` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
     pub fn parse_rgb_lighting(&self, ctx: &BspParseContext) -> Option<BspResult<BspLighting>> {
         Some(BspLighting::read_lit(self.get("RGBLIGHTING")?, ctx, true).job("Parsing RGBLIGHTING BSPX lump"))
     }
+
+    /// Parses the `LIGHTGRID_OCTREE` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+    pub fn parse_light_grid_octree(&self, ctx: &BspParseContext) -> Option<BspResult<LightGridOctree>> {
+        let mut reader = BspByteReader::new(self.get("LIGHTGRID_OCTREE")?, ctx);
+        Some(reader.read().job("Parsing LIGHTGRID_OCTREE BSPX lump"))
+    }
 }
+
+/// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
+#[derive(Debug, Clone)]
+pub struct LightGridOctree {
+    pub step: Vec3,
+    pub size: IVec3,
+    pub mins: Vec3,
+    pub num_styles: u8,
+    pub root_idx: u32,
+    pub nodes: Vec<LightGridNode>,
+    pub leafs: Vec<LightGridLeaf>,
+}
+impl BspParse for LightGridOctree {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        let step: Vec3 = reader.read().job("step size")?;
+        let size: IVec3 = reader.read().job("grid size")?;
+        let mins: Vec3 = reader.read().job("grid mins")?;
+
+        let num_styles: u8 = reader.read().job("number of styles")?;
+        
+        let root_idx: u32 = reader.read().job("root node index")?;
+
+        let num_nodes: u32 = reader.read().job("number of nodes")?;
+        let mut nodes: Vec<LightGridNode> = Vec::with_capacity(num_nodes as usize);
+
+        for _ in 0..num_nodes {
+            nodes.push(reader.read().job("reading node")?);
+        }
+
+        let num_leafs: u32 = reader.read().job("number of leafs")?;
+        let mut leafs: Vec<LightGridLeaf> = Vec::with_capacity(num_leafs as usize);
+
+        for _ in 0..num_leafs {
+            leafs.push(reader.read().job("reading leaf")?);
+        }
+        
+        Ok(Self {
+            step,
+            size,
+            mins,
+            num_styles,
+            root_idx,
+            nodes,
+            leafs,
+        })
+    }
+    
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        unimplemented!("LightGridOctree is of variable size")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LightGridNode {
+    pub division_point: UVec3,
+    pub children: [u32; 8],
+}
+impl_bsp_parse_simple!(LightGridNode, division_point, children);
+impl LightGridNode {
+    // TODO what do these do?
+    pub const LEAF: u32 = 1 << 31;
+    pub const MISSING: u32 = 1 << 30;
+    
+    pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
+        self.children[
+            (((point.z >= self.division_point.z as f32) as usize) << 0) |
+            (((point.y >= self.division_point.y as f32) as usize) << 1) |
+            (((point.x >= self.division_point.x as f32) as usize) << 2)
+        ]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LightGridLeaf {
+    pub mins: IVec3,
+    size: IVec3,
+
+    data: Vec<LightGridCell>,
+}
+impl BspParse for LightGridLeaf {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        let mins: IVec3 = reader.read().job("position")?;
+        let size: IVec3 = reader.read().job("size")?;
+        println!("leaf at {mins} with size {size}");
+
+        let mut data = Vec::with_capacity(size.element_product() as usize);
+        
+        for _ in 0..size.element_product() {
+            data.push(reader.read().job("Reading cell")?);
+        }
+
+        Ok(Self {
+            mins,
+            size,
+
+            data,
+        })
+    }
+    
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        unimplemented!("LightGridLeaf is of variable size")
+    }
+}
+impl LightGridLeaf {
+    #[inline]
+    pub fn cells(&self) -> &[LightGridCell] {
+        &self.data
+    }
+    
+    /// Returns the index into `data` of the cell at the position specified.
+    #[inline]
+    pub const fn cell_idx(&self, x: u32, y: u32, z: u32) -> usize {
+        ((z * self.size.x.abs() as u32 * self.size.y.abs() as u32) + (y * self.size.x.abs() as u32) + x) as usize
+    }
+
+    /// Returns the cell at the specified position, panics if the position is out of bounds.
+    pub fn get_cell(&self, x: u32, y: u32, z: u32) -> &LightGridCell {
+        &self.data[self.cell_idx(x, y, z)]
+    }
+    /// Returns the cell at the specified position, panics if the position is out of bounds.
+    pub fn get_cell_mut(&mut self, x: u32, y: u32, z: u32) -> &mut LightGridCell {
+        let idx = self.cell_idx(x, y, z);
+        &mut self.data[idx]
+    }
+
+    #[inline]
+    pub const fn size(&self) -> IVec3 {
+        self.size
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum LightGridCell {
+    /// Cell is out of bounds. (TODO is this true?)
+    Occluded,
+    /// Cell is filled, 
+    Filled(SmallVec<[LightmapCellSample; 4]>),
+}
+impl BspParse for LightGridCell {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        let style_count: u8 = reader.read().job("style count")?;
+        if style_count == 255 {
+            return Ok(Self::Occluded);
+        }
+
+        let mut samples = SmallVec::with_capacity(style_count as usize);
+        for _ in 0..style_count {
+            samples.push(reader.read().job("cell sample")?);
+        }
+        
+        Ok(Self::Filled(samples))
+    }
+    
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        unimplemented!("LightGridCell is of variable size")
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LightmapCellSample {
+    pub style: LightmapStyle,
+    pub color: [u8; 3],
+}
+impl_bsp_parse_simple!(LightmapCellSample, style, color);
