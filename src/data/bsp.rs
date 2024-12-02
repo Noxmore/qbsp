@@ -3,14 +3,13 @@
 use crate::*;
 use super::*;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspEdge {
     /// The index to the first vertex this edge connects
     pub a: UBspValue,
     /// The index to the second vertex this edge connects
     pub b: UBspValue,
 }
-impl_bsp_parse_simple!(BspEdge, a, b);
 
 /// Byte that dictates how a specific BSP lightmap appears:
 /// - 255 means there is no lightmap.
@@ -47,7 +46,7 @@ impl std::fmt::Display for LightmapStyle {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspFace {
     /// Index of the plane the face is parallel to
     pub plane_idx: UBspValue,
@@ -72,7 +71,6 @@ pub struct BspFace {
     /// Offset of the lightmap (in bytes) in the lightmap lump, or -1 if no lightmap
     pub lightmap_offset: i32,
 }
-impl_bsp_parse_simple!(BspFace, plane_idx, plane_side, first_edge, num_edges, texture_info_idx, lightmap_styles, lightmap_offset);
 
 impl BspFace {
     /// Returns an iterator that retrieves the vertex positions that make up this face from `bsp`.
@@ -88,7 +86,7 @@ impl BspFace {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspTexInfo {
     pub u_axis: Vec3,
     pub u_offset: f32,
@@ -99,22 +97,20 @@ pub struct BspTexInfo {
     pub texture_idx: u32,
     pub flags: BspTexFlags,
 }
-impl_bsp_parse_simple!(BspTexInfo, u_axis, u_offset, v_axis, v_offset, texture_idx, flags);
 
-bsp_parsed_unit_enum! {
-    #[derive(Default)]
-    pub enum BspTexFlags: u32 {
-        #[default]
-        /// Normal lightmapped surface.
-        Normal = 0,
-        /// No lighting or 256 subdivision.
-        Special = 1,
-        /// Texture cannot be found.
-        Missing = 2,
-    }
+#[derive(BspParse, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum BspTexFlags {
+    #[default]
+    /// Normal lightmapped surface.
+    Normal = 0,
+    /// No lighting or 256 subdivision.
+    Special = 1,
+    /// Texture cannot be found.
+    Missing = 2,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspModel {
     pub bound: BoundingBox,
     /// Origin of model, usually (0,0,0)
@@ -127,16 +123,14 @@ pub struct BspModel {
     pub first_face: u32,
     pub num_faces: u32,
 }
-impl_bsp_parse_simple!(BspModel, bound, origin, head_node, visleafs, first_face, num_faces);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspPlane {
     pub normal: Vec3,
     pub dist: f32,
     /// Not really sure what this is, not used anywhere
     pub ty: u32,
 }
-impl_bsp_parse_simple!(BspPlane, normal, dist, ty);
 
 /// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
 pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspTexture>>> {
@@ -155,7 +149,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
     Ok(textures)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspNode {
     /// Index of the [BspPlane] that splits the node.
     pub plane_idx: u32,
@@ -170,28 +164,27 @@ pub struct BspNode {
     /// Number of faces this node contains.
     pub face_num: UBspValue,
 }
-impl_bsp_parse_simple!(BspNode, plane_idx, front, back, bound, face_idx, face_num);
 
-bsp_parsed_unit_enum! {
-    pub enum BspTreeLeafContents: i32 {
-        Empty = -1,
-        Solid = -2,
-        Water = -3,
-        Slime = -4,
-        Lava  = -5,
-        Sky   = -6,
-        // Origin = -7, removed at csg time
-        // Clip = -8, changed to contents_solid
-        Current0 = -9,
-        Current90 = -10,
-        Current180 = -11,
-        Current270 = -12,
-        CurrentUp = -13,
-        CurrentDown = -14,
-    }
+#[derive(BspParse, Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(i32)]
+pub enum BspTreeLeafContents {
+    Empty = -1,
+    Solid = -2,
+    Water = -3,
+    Slime = -4,
+    Lava  = -5,
+    Sky   = -6,
+    // Origin = -7, removed at csg time
+    // Clip = -8, changed to contents_solid
+    Current0 = -9,
+    Current90 = -10,
+    Current180 = -11,
+    Current270 = -12,
+    CurrentUp = -13,
+    CurrentDown = -14,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspTreeLeaf {
     pub contents: BspTreeLeafContents,
     pub vis_list: u32,
@@ -206,7 +199,6 @@ pub struct BspTreeLeaf {
     pub ambience_slime: u8,
     pub ambience_lava: u8,
 }
-impl_bsp_parse_simple!(BspTreeLeaf, contents, vis_list, bound, face_idx, face_num, ambience_water, ambience_sky, ambience_slime, ambience_lava);
 
 #[derive(Clone)]
 pub struct BspTexture {
@@ -238,7 +230,7 @@ impl std::fmt::Debug for BspTexture {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(BspParse, Debug, Clone)]
 pub struct BspTextureHeader {
     pub name: FixedStr<16>,
 
@@ -250,7 +242,6 @@ pub struct BspTextureHeader {
     #[allow(unused)] pub offset_quarter: u32,
     #[allow(unused)] pub offset_eighth: u32,
 }
-impl_bsp_parse_simple!(BspTextureHeader, name, width, height, offset_full, offset_half, offset_quarter, offset_eighth);
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.
 #[derive(Clone)]

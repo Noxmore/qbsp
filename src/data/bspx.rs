@@ -5,12 +5,11 @@ use super::*;
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BspxLumpEntry {
     pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
     pub entry: LumpEntry,
 }
-impl_bsp_parse_simple!(BspxLumpEntry, name, entry);
 
 #[derive(Debug, Clone, Default)]
 pub struct BspxDirectory {
@@ -133,12 +132,11 @@ impl BspParse for LightGridOctree {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(BspParse, Debug, Clone)]
 pub struct LightGridNode {
     pub division_point: UVec3,
     pub children: [u32; 8],
 }
-impl_bsp_parse_simple!(LightGridNode, division_point, children);
 impl LightGridNode {
     // TODO what do these do?
     pub const LEAF: u32 = 1 << 31;
@@ -239,9 +237,8 @@ impl BspParse for LightGridCell {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct LightmapCellSample {
     pub style: LightmapStyle,
     pub color: [u8; 3],
 }
-impl_bsp_parse_simple!(LightmapCellSample, style, color);

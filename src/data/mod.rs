@@ -43,7 +43,7 @@ pub trait BspParse: Sized {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
     fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
-macro_rules! impl_bsp_read_primitive {($ty:ty) => {
+macro_rules! impl_bsp_parse_primitive {($ty:ty) => {
     impl BspParse for $ty {
         #[inline]
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
@@ -55,65 +55,24 @@ macro_rules! impl_bsp_read_primitive {($ty:ty) => {
         }
     }
 };}
-
-/// Used for [impl_bsp_parse_simple] to get the struct size of a field using type coercion.
-#[inline]
-#[doc(hidden)]
-pub fn bsp_struct_size<T: BspParse>(_: &T, ctx: &BspParseContext) -> usize {
-    T::bsp_struct_size(ctx)
-}
-/// It would be nicer to do this with a proc macro, but i'd rather keep this to one crate if possible
-#[macro_export]
-#[doc(hidden)]
-macro_rules! impl_bsp_parse_simple {($ty:ty, $($field:ident),+ $(,)?) => {
+macro_rules! impl_bsp_parse_vector {($ty:ty : [$element:ty; $count:expr]) => {
     impl BspParse for $ty {
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-            Ok(Self { $($field: reader.read().job(concat!("Reading field \"", stringify!($field), "\" on type ", stringify!($ty)))?),+ })
+            Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
         }
-        fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-            // TODO this is annoying, there should be a better way of doing this
-            let tmp: Self = unsafe { mem::zeroed() };
-            $($crate::data::bsp_struct_size(&tmp.$field, ctx) +)+ 0
+        fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+            size_of::<$element>() * $count
         }
     }
 };}
 
-#[macro_export]
-#[doc(hidden)]
-macro_rules! bsp_parsed_unit_enum {
-    {
-        $(#[$outer:meta])*
-        $vis:vis enum $name:ident: $repr:ty {
-            $($(#[$inner:meta $($args:tt)*])* $variant:ident = $num:literal),+ $(,)?
-        }
-    } => {
-        $(#[$outer])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        #[repr($repr)]
-        $vis enum $name {
-            $($(#[$inner $($args)*])* $variant = $num),+
-        }
-        impl BspParse for $name {
-            fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-                match reader.read::<$repr>()? {
-                    $($num => Ok(Self::$variant)),+,
-                    n => Err(BspParseError::InvalidVariant { value: n as i32, acceptable: concat!($(stringify!($num), " - ", stringify!($variant), "\n"),+) }),
-                }
-            }
-            #[inline]
-            fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-                mem::size_of::<$repr>()
-            }
-        }
-    };
-}
-impl_bsp_read_primitive!(u16);
-impl_bsp_read_primitive!(u32);
+impl_bsp_parse_primitive!(u16);
+impl_bsp_parse_primitive!(u32);
 
-impl_bsp_read_primitive!(i16);
-impl_bsp_read_primitive!(i32);
+impl_bsp_parse_primitive!(i16);
+impl_bsp_parse_primitive!(i32);
 
-impl_bsp_read_primitive!(f32);
+impl_bsp_parse_primitive!(f32);
 
 impl BspParse for u8 {
     #[inline]
@@ -126,10 +85,10 @@ impl BspParse for u8 {
     }
 }
 
-impl_bsp_parse_simple!(Vec3, x, y, z);
-impl_bsp_parse_simple!(IVec3, x, y, z);
-impl_bsp_parse_simple!(UVec3, x, y, z);
-impl_bsp_parse_simple!(U16Vec3, x, y, z);
+impl_bsp_parse_vector!(Vec3: [f32; 3]);
+impl_bsp_parse_vector!(IVec3: [i32; 3]);
+impl_bsp_parse_vector!(UVec3: [u32; 3]);
+impl_bsp_parse_vector!(U16Vec3: [u16; 3]);
 
 // We'd have to change this if we want to impl BspRead for u8
 impl<T: BspParse + std::fmt::Debug, const N: usize> BspParse for [T; N] {
@@ -239,18 +198,16 @@ impl<const N: usize> std::fmt::Display for FixedStr<N> {
 }
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct BoundingBox {
     pub min: Vec3,
     pub max: Vec3,
 }
-impl_bsp_parse_simple!(BoundingBox, min, max);
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct ShortBoundingBox {
     pub min: U16Vec3,
     pub max: U16Vec3,
 }
-impl_bsp_parse_simple!(ShortBoundingBox, min, max);
 impl From<ShortBoundingBox> for BoundingBox {
     fn from(value: ShortBoundingBox) -> Self {
         Self { min: value.min.as_vec3(), max: value.max.as_vec3() }
@@ -263,12 +220,11 @@ pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 
 
 /// Points to the chunk of data in the file a lump resides in.
-#[derive(Debug, Clone, Copy)]
+#[derive(BspParse, Debug, Clone, Copy)]
 pub struct LumpEntry {
     pub offset: u32,
     pub len: u32,
 }
-impl_bsp_parse_simple!(LumpEntry, offset, len);
 
 impl LumpEntry {
     /// Returns the slice of `data` (BSP file input) that this entry points to.

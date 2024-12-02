@@ -13,6 +13,7 @@ pub mod util;
 pub use glam;
 pub use image;
 pub use smallvec;
+pub use q1bsp_macros::*;
 
 /// The default quake palette.
 pub static QUAKE_PALETTE: Palette = unsafe { mem::transmute_copy(include_bytes!("../palette.lmp")) };
