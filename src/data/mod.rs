@@ -18,7 +18,7 @@ impl<'a> BspByteReader<'a> {
     }
 
     #[inline]
-    pub fn read<T: BspParse>(&mut self) -> BspResult<T> {
+    pub fn read<T: BspValue>(&mut self) -> BspResult<T> {
         T::bsp_parse(self)
     }
 
@@ -39,12 +39,12 @@ impl<'a> BspByteReader<'a> {
 }
 
 /// Defines how a type should be read from a BSP file.
-pub trait BspParse: Sized {
+pub trait BspValue: Sized {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
     fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
 macro_rules! impl_bsp_parse_primitive {($ty:ty) => {
-    impl BspParse for $ty {
+    impl BspValue for $ty {
         #[inline]
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
             Ok(<$ty>::from_le_bytes(reader.read_bytes(size_of::<$ty>())?.try_into().unwrap()))
@@ -56,7 +56,7 @@ macro_rules! impl_bsp_parse_primitive {($ty:ty) => {
     }
 };}
 macro_rules! impl_bsp_parse_vector {($ty:ty : [$element:ty; $count:expr]) => {
-    impl BspParse for $ty {
+    impl BspValue for $ty {
         fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
             Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
         }
@@ -74,7 +74,7 @@ impl_bsp_parse_primitive!(i32);
 
 impl_bsp_parse_primitive!(f32);
 
-impl BspParse for u8 {
+impl BspValue for u8 {
     #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         reader.read_bytes(1).map(|bytes| bytes[0])
@@ -91,7 +91,7 @@ impl_bsp_parse_vector!(UVec3: [u32; 3]);
 impl_bsp_parse_vector!(U16Vec3: [u16; 3]);
 
 // We'd have to change this if we want to impl BspRead for u8
-impl<T: BspParse + std::fmt::Debug, const N: usize> BspParse for [T; N] {
+impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
     #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         // Look ma, no heap allocations!
@@ -113,7 +113,7 @@ pub enum BspVariableValue<BSP2, BSP29> {
     BSP2(BSP2),
     BSP29(BSP29),
 }
-impl<BSP2: BspParse, BSP29: BspParse> BspParse for BspVariableValue<BSP2, BSP29> {
+impl<BSP2: BspValue, BSP29: BspValue> BspValue for BspVariableValue<BSP2, BSP29> {
     #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         match reader.ctx.format {
@@ -151,7 +151,7 @@ pub type IBspValue = BspVariableValue<i32, i16>;
 pub struct FixedStr<const N: usize> {
     data: [u8; N],
 }
-impl<const N: usize> BspParse for FixedStr<N> {
+impl<const N: usize> BspValue for FixedStr<N> {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let data = reader.read()?;
         Self::new(data).map_err(BspParseError::map_utf8_error(&data))
@@ -198,12 +198,12 @@ impl<const N: usize> std::fmt::Display for FixedStr<N> {
 }
 
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BoundingBox {
     pub min: Vec3,
     pub max: Vec3,
 }
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct ShortBoundingBox {
     pub min: U16Vec3,
     pub max: U16Vec3,
@@ -220,7 +220,7 @@ pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 
 
 /// Points to the chunk of data in the file a lump resides in.
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct LumpEntry {
     pub offset: u32,
     pub len: u32,
@@ -281,7 +281,7 @@ impl LumpDirectory {
         ]
     }
 }
-impl BspParse for LumpDirectory {
+impl BspValue for LumpDirectory {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let mut dir = Self {
             entities: reader.read().job("Reading entities entry")?,

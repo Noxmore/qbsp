@@ -141,7 +141,7 @@ impl Palette {
 }
 
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
-pub fn read_lump<T: BspParse>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
+pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
     // let entry = lump_dir.get(lump);
     let lump_data = entry.get(data)?;
     let lump_entries = entry.len as usize / T::bsp_struct_size(ctx);

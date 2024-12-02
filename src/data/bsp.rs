@@ -3,7 +3,7 @@
 use crate::*;
 use super::*;
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspEdge {
     /// The index to the first vertex this edge connects
     pub a: UBspValue,
@@ -25,7 +25,7 @@ impl LightmapStyle {
     /// No lightmap.
     pub const NONE: Self = Self(u8::MAX);
 }
-impl BspParse for LightmapStyle {
+impl BspValue for LightmapStyle {
     #[inline]
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         reader.read().map(Self)
@@ -46,7 +46,7 @@ impl std::fmt::Display for LightmapStyle {
 }
 
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspFace {
     /// Index of the plane the face is parallel to
     pub plane_idx: UBspValue,
@@ -86,7 +86,7 @@ impl BspFace {
     }
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspTexInfo {
     pub u_axis: Vec3,
     pub u_offset: f32,
@@ -98,7 +98,7 @@ pub struct BspTexInfo {
     pub flags: BspTexFlags,
 }
 
-#[derive(BspParse, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+#[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum BspTexFlags {
     #[default]
@@ -110,7 +110,7 @@ pub enum BspTexFlags {
     Missing = 2,
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspModel {
     pub bound: BoundingBox,
     /// Origin of model, usually (0,0,0)
@@ -124,7 +124,7 @@ pub struct BspModel {
     pub num_faces: u32,
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspPlane {
     pub normal: Vec3,
     pub dist: f32,
@@ -149,7 +149,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
     Ok(textures)
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspNode {
     /// Index of the [BspPlane] that splits the node.
     pub plane_idx: u32,
@@ -165,7 +165,7 @@ pub struct BspNode {
     pub face_num: UBspValue,
 }
 
-#[derive(BspParse, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum BspTreeLeafContents {
     Empty = -1,
@@ -184,7 +184,7 @@ pub enum BspTreeLeafContents {
     CurrentDown = -14,
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspTreeLeaf {
     pub contents: BspTreeLeafContents,
     pub vis_list: u32,
@@ -205,7 +205,7 @@ pub struct BspTexture {
     pub header: BspTextureHeader,
     pub data: Option<Vec<u8>>,
 }
-impl BspParse for BspTexture {
+impl BspValue for BspTexture {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         // TODO animated textures and the like
         let start_pos = reader.pos;
@@ -230,7 +230,7 @@ impl std::fmt::Debug for BspTexture {
     }
 }
 
-#[derive(BspParse, Debug, Clone)]
+#[derive(BspValue, Debug, Clone)]
 pub struct BspTextureHeader {
     pub name: FixedStr<16>,
 

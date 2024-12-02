@@ -2,8 +2,8 @@ use proc_macro2::*;
 use quote::quote;
 use syn::*;
 
-#[proc_macro_derive(BspParse)]
-pub fn bsp_parse_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(BspValue)]
+pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
 
@@ -17,10 +17,10 @@ pub fn bsp_parse_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
                     (
                         quote! {
                             Ok(Self {
-                                #(#field_names: BspParse::bsp_parse(reader).job(concat!("Reading field \"", stringify!(#field_names), "\" on type ", stringify!(#ident)))?,)*
+                                #(#field_names: BspValue::bsp_parse(reader).job(concat!("Reading field \"", stringify!(#field_names), "\" on type ", stringify!(#ident)))?,)*
                             })
                         },
-                        quote! { #(<#types as BspParse>::bsp_struct_size(ctx) + )* 0 },
+                        quote! { #(<#types as BspValue>::bsp_struct_size(ctx) + )* 0 },
                     )
                 }
                 Fields::Unnamed(_) => panic!("Tuple structs not supported"),
@@ -46,7 +46,7 @@ pub fn bsp_parse_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
             let (variants2, numbers2) = (variants.clone(), numbers.clone());
 
             (
-                quote! { match <#repr as BspParse>::bsp_parse(reader)? {
+                quote! { match <#repr as BspValue>::bsp_parse(reader)? {
                     #(#numbers => Ok(Self::#variants)),*,
                     n => Err(BspParseError::InvalidVariant { value: n as i32, acceptable: concat!(#(stringify!(#numbers2), " - ", stringify!(#variants2), "\n"),*) }),
                 } },
@@ -57,7 +57,7 @@ pub fn bsp_parse_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
     };
     
     quote! {
-        impl BspParse for #ident {
+        impl BspValue for #ident {
             fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
                 #bsp_parse_contents
             }

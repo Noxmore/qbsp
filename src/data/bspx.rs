@@ -5,7 +5,7 @@ use super::*;
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspxLumpEntry {
     pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
     pub entry: LumpEntry,
@@ -15,7 +15,7 @@ pub struct BspxLumpEntry {
 pub struct BspxDirectory {
     pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
 }
-impl BspParse for BspxDirectory {
+impl BspValue for BspxDirectory {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         match reader.read().and_then(|magic| {
             if &magic != b"BSPX" {
@@ -92,7 +92,7 @@ pub struct LightGridOctree {
     pub nodes: Vec<LightGridNode>,
     pub leafs: Vec<LightGridLeaf>,
 }
-impl BspParse for LightGridOctree {
+impl BspValue for LightGridOctree {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let step: Vec3 = reader.read().job("step size")?;
         let size: IVec3 = reader.read().job("grid size")?;
@@ -132,7 +132,7 @@ impl BspParse for LightGridOctree {
     }
 }
 
-#[derive(BspParse, Debug, Clone)]
+#[derive(BspValue, Debug, Clone)]
 pub struct LightGridNode {
     pub division_point: UVec3,
     pub children: [u32; 8],
@@ -158,7 +158,7 @@ pub struct LightGridLeaf {
 
     data: Vec<LightGridCell>,
 }
-impl BspParse for LightGridLeaf {
+impl BspValue for LightGridLeaf {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let mins: IVec3 = reader.read().job("position")?;
         let size: IVec3 = reader.read().job("size")?;
@@ -217,7 +217,7 @@ pub enum LightGridCell {
     /// Cell is filled, 
     Filled(SmallVec<[LightmapCellSample; 4]>),
 }
-impl BspParse for LightGridCell {
+impl BspValue for LightGridCell {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let style_count: u8 = reader.read().job("style count")?;
         if style_count == 255 {
@@ -237,7 +237,7 @@ impl BspParse for LightGridCell {
     }
 }
 
-#[derive(BspParse, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy)]
 pub struct LightmapCellSample {
     pub style: LightmapStyle,
     pub color: [u8; 3],
