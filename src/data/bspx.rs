@@ -82,54 +82,15 @@ impl BspxData {
 }
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
-#[derive(Debug, Clone)]
+#[derive(BspValue, Debug, Clone)]
 pub struct LightGridOctree {
     pub step: Vec3,
     pub size: IVec3,
     pub mins: Vec3,
     pub num_styles: u8,
     pub root_idx: u32,
-    pub nodes: Vec<LightGridNode>,
-    pub leafs: Vec<LightGridLeaf>,
-}
-impl BspValue for LightGridOctree {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        let step: Vec3 = reader.read().job("step size")?;
-        let size: IVec3 = reader.read().job("grid size")?;
-        let mins: Vec3 = reader.read().job("grid mins")?;
-
-        let num_styles: u8 = reader.read().job("number of styles")?;
-        
-        let root_idx: u32 = reader.read().job("root node index")?;
-
-        let num_nodes: u32 = reader.read().job("number of nodes")?;
-        let mut nodes: Vec<LightGridNode> = Vec::with_capacity(num_nodes as usize);
-
-        for _ in 0..num_nodes {
-            nodes.push(reader.read().job("reading node")?);
-        }
-
-        let num_leafs: u32 = reader.read().job("number of leafs")?;
-        let mut leafs: Vec<LightGridLeaf> = Vec::with_capacity(num_leafs as usize);
-
-        for _ in 0..num_leafs {
-            leafs.push(reader.read().job("reading leaf")?);
-        }
-        
-        Ok(Self {
-            step,
-            size,
-            mins,
-            num_styles,
-            root_idx,
-            nodes,
-            leafs,
-        })
-    }
-    
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        unimplemented!("LightGridOctree is of variable size")
-    }
+    pub nodes: BspVariableArray<LightGridNode, u32>,
+    pub leafs: BspVariableArray<LightGridLeaf, u32>,
 }
 
 #[derive(BspValue, Debug, Clone)]

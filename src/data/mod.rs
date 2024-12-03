@@ -3,6 +3,8 @@
 pub mod bsp;
 pub mod bspx;
 
+use std::marker::PhantomData;
+
 use crate::*;
 
 /// Like an [io::Cursor], but i don't have to constantly juggle buffers.
@@ -145,6 +147,31 @@ pub type UBspValue = BspVariableValue<u32, u16>;
 /// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
 pub type IBspValue = BspVariableValue<i32, i16>;
 
+/// A variable length array in the format of `N` (count) then `[T; N]` (elements).
+#[derive(Debug, Clone, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
+pub struct BspVariableArray<T, N> {
+    #[deref]
+    #[deref_mut]
+    #[into_iterator(owned, ref,  ref_mut)]
+    pub inner: Vec<T>,
+    _marker: PhantomData<N>,
+}
+impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue for BspVariableArray<T, N> {
+    #[track_caller] // Just in case this unwrap fails, almost certainly not needed.
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        let count: usize = reader.read::<N>().job("count")?.try_into().unwrap();
+        let mut inner = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            inner.push(reader.read().job(std::any::type_name::<T>())?);
+        }
+
+        Ok(Self { inner, _marker: PhantomData })
+    }
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        unimplemented!("{} is of variable size", std::any::type_name::<Self>());
+    }
+}
 
 /// Fixed-sized UTF-8 string. Zero-padded.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
