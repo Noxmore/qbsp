@@ -148,7 +148,7 @@ pub type UBspValue = BspVariableValue<u32, u16>;
 pub type IBspValue = BspVariableValue<i32, i16>;
 
 /// A variable length array in the format of `N` (count) then `[T; N]` (elements).
-#[derive(Debug, Clone, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
+#[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
 pub struct BspVariableArray<T, N> {
     #[deref]
     #[deref_mut]
