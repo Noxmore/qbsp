@@ -2,6 +2,7 @@ use proc_macro2::*;
 use quote::quote;
 use syn::*;
 
+/// Automatically implements BspValue on structs in the order of the fields, or unit enums with `#[repr(...)]` and explicit discriminants (e.g. Foo = 1).
 #[proc_macro_derive(BspValue)]
 pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
