@@ -85,7 +85,7 @@ impl BspxData {
 #[derive(BspValue, Debug, Clone)]
 pub struct LightGridOctree {
     pub step: Vec3,
-    pub size: IVec3,
+    pub size: UVec3, // TODO make sure this is always positive
     pub mins: Vec3,
     pub num_styles: u8,
     pub root_idx: u32,
@@ -114,15 +114,15 @@ impl LightGridNode {
 
 #[derive(Debug, Clone)]
 pub struct LightGridLeaf {
-    pub mins: IVec3,
-    size: IVec3,
+    pub mins: UVec3, // TODO make sure this is always positive
+    size: UVec3, // TODO make sure this is always positive
 
     data: Vec<LightGridCell>,
 }
 impl BspValue for LightGridLeaf {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        let mins: IVec3 = reader.read().job("position")?;
-        let size: IVec3 = reader.read().job("size")?;
+        let mins: UVec3 = reader.read().job("position")?;
+        let size: UVec3 = reader.read().job("size")?;
         println!("leaf at {mins} with size {size}");
 
         let mut data = Vec::with_capacity(size.element_product() as usize);
@@ -152,7 +152,7 @@ impl LightGridLeaf {
     /// Returns the index into `data` of the cell at the position specified.
     #[inline]
     pub const fn cell_idx(&self, x: u32, y: u32, z: u32) -> usize {
-        ((z * self.size.x.abs() as u32 * self.size.y.abs() as u32) + (y * self.size.x.abs() as u32) + x) as usize
+        ((z * self.size.x * self.size.y) + (y * self.size.x) + x) as usize
     }
 
     /// Returns the cell at the specified position, panics if the position is out of bounds.
@@ -166,7 +166,7 @@ impl LightGridLeaf {
     }
 
     #[inline]
-    pub const fn size(&self) -> IVec3 {
+    pub const fn size(&self) -> UVec3 {
         self.size
     }
 }
