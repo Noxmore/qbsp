@@ -123,7 +123,6 @@ impl BspValue for LightGridLeaf {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let mins: UVec3 = reader.read().job("position")?;
         let size: UVec3 = reader.read().job("size")?;
-        println!("leaf at {mins} with size {size}");
 
         let mut data = Vec::with_capacity(size.element_product() as usize);
         
