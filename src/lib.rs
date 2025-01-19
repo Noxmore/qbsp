@@ -247,19 +247,15 @@ impl BspData {
     }
 
     /// Parses embedded textures using the provided palette. Use [QUAKE_PALETTE] for the default Quake palette.
-    pub fn parse_embedded_textures(&self, palette: &Palette) -> HashMap<String, image::RgbImage> {
-        let mut map = HashMap::new();
+    pub fn parse_embedded_textures<'a, 'p: 'a>(&'a self, palette: &'p Palette) -> impl Iterator<Item = (&'a str, image::RgbImage)> + 'a {
+        self.textures.iter().flatten().filter(|texture| texture.data.is_some()).map(|texture| {
+            let Some(data) = &texture.data else { unreachable!() };
 
-        for texture in self.textures.iter().flatten() {
-            let Some(data) = &texture.data else { continue };
-            // TODO Do proper error handling if this returns None
             let image = image::RgbImage::from_fn(texture.header.width, texture.header.height, |x, y| {
                 image::Rgb(palette.colors[data[(y * texture.header.width + x) as usize] as usize])
             });
             
-            map.insert(texture.header.name.to_string(), image);
-        }
-        
-        map
+            (texture.header.name.as_str(), image)
+        })
     }
 }
