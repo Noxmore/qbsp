@@ -7,8 +7,10 @@ use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
 pub struct ComputeLightmapSettings {
     /// The of a pixel is no lightmaps are stored there.
     pub default_color: [u8; 3],
-    /// A single pixel of a lightmap atlas is reserved for faces which don't have a lightmap, this is the color of that pixel.
+    /// A single pixel of a lightmap atlas is reserved for faces which don't have a lightmap or `special` flag, this is the color of that pixel.
     pub no_lighting_color: [u8; 3],
+    /// A single pixel of a lightmap atlas is reserved for faces which don't have a lightmap, but do have the `special` flag, this is the color of that pixel.
+    pub special_lighting_color: [u8; 3],
     pub max_width: u32,
     pub max_height: u32,
 }
@@ -16,7 +18,8 @@ impl Default for ComputeLightmapSettings {
     fn default() -> Self {
         Self {
             default_color: [0; 3],
-            no_lighting_color: [255; 3],
+            no_lighting_color: [0; 3],
+            special_lighting_color: [255; 3],
             max_width: 2048,
             max_height: u32::MAX,
         }
@@ -35,6 +38,30 @@ pub enum ComputeLightmapAtlasError {
     },
     #[error("No lightmaps")]
     NoLightmaps,
+}
+
+#[derive(Default)]
+struct ReservedLightmapPixel {
+    position: Option<UVec2>,
+}
+impl ReservedLightmapPixel {
+    pub fn get_uvs<LM>(
+        &mut self,
+        face: &BspFace,
+        lightmap_packer: &mut impl LightmapPacker<Input = LM>,
+        lightmap_provider: impl FnOnce() -> LM,
+    ) -> Result<SmallVec<[Vec2; 5]>, ComputeLightmapAtlasError> {
+        let position = match self.position {
+            Some(v) => v,
+            None => {
+                let rect = lightmap_packer.pack(face, lightmap_provider())?;
+                self.position = Some(rect.min);
+                rect.min
+            }
+        };
+
+        Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize])
+    }
 }
 
 impl BspData {
@@ -58,26 +85,28 @@ impl BspData {
 
         let mut lightmap_uvs: HashMap<u32, SmallVec<[Vec2; 5]>> = HashMap::new();
 
+        let mut empty_reserved_pixel = ReservedLightmapPixel::default();
+        let mut special_reserved_pixel = ReservedLightmapPixel::default();
+
         let atlas = match ty {
             LightmapAtlasType::PerStyle => {
                 let mut lightmap_packer = PerStyleLightmapPacker::new(config);
 
-                let mut none_lightmap_pos: Option<UVec2> = None;
-
                 for (face_idx, face) in self.faces.iter().enumerate() {
                     if face.lightmap_offset.is_negative() {
-                        let none_lightmap_pos = match none_lightmap_pos {
-                            Some(v) => v,
-                            None => {
-                                let rect = lightmap_packer.pack(face, Lightmaps::new_single_color([1, 1], settings.no_lighting_color))?;
-                                none_lightmap_pos = Some(rect.min);
-                                rect.min
-                            }
-                        };
+                        let tex_info = self.tex_info[face.texture_info_idx.bsp2() as usize];
 
                         lightmap_uvs.insert(
                             face_idx as u32,
-                            smallvec![none_lightmap_pos.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize],
+                            if tex_info.flags != BspTexFlags::Normal {
+                                special_reserved_pixel.get_uvs(face, &mut lightmap_packer, || {
+                                    Lightmaps::new_single_color([1, 1], settings.special_lighting_color)
+                                })?
+                            } else {
+                                empty_reserved_pixel.get_uvs(face, &mut lightmap_packer, || {
+                                    Lightmaps::new_single_color([1, 1], settings.no_lighting_color)
+                                })?
+                            },
                         );
                         continue;
                     }
@@ -100,30 +129,31 @@ impl BspData {
             LightmapAtlasType::PerSlot => {
                 let mut lightmap_packer = PerSlotLightmapPacker::new(config);
 
-                let mut none_lightmap_pos: Option<UVec2> = None;
-
                 for (face_idx, face) in self.faces.iter().enumerate() {
                     if face.lightmap_offset.is_negative() {
-                        let none_lightmap_pos = match none_lightmap_pos {
-                            Some(v) => v,
-                            None => {
-                                let rect = lightmap_packer.pack(
-                                    face,
-                                    [(); 4].map(|_| {
-                                        (
-                                            image::RgbImage::from_pixel(1, 1, image::Rgb(settings.no_lighting_color)),
-                                            LightmapStyle::NONE,
-                                        )
-                                    }),
-                                )?;
-                                none_lightmap_pos = Some(rect.min);
-                                rect.min
-                            }
-                        };
+                        let tex_info = self.tex_info[face.texture_info_idx.bsp2() as usize];
 
                         lightmap_uvs.insert(
                             face_idx as u32,
-                            smallvec![none_lightmap_pos.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize],
+                            if tex_info.flags != BspTexFlags::Normal {
+                                special_reserved_pixel.get_uvs(face, &mut lightmap_packer, || {
+                                    [(); 4].map(|_| {
+                                        (
+                                            image::RgbImage::from_pixel(1, 1, image::Rgb(settings.special_lighting_color)),
+                                            LightmapStyle::NORMAL,
+                                        )
+                                    })
+                                })?
+                            } else {
+                                empty_reserved_pixel.get_uvs(face, &mut lightmap_packer, || {
+                                    [(); 4].map(|_| {
+                                        (
+                                            image::RgbImage::from_pixel(1, 1, image::Rgb(settings.no_lighting_color)),
+                                            LightmapStyle::NORMAL,
+                                        )
+                                    })
+                                })?
+                            },
                         );
                         continue;
                     }
