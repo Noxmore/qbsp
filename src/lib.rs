@@ -2,7 +2,7 @@ pub mod prelude;
 pub(crate) use prelude::*;
 
 pub mod data;
-pub(crate) use data::{*, bsp::*, bspx::*};
+pub(crate) use data::{bsp::*, bspx::*, *};
 
 #[cfg(feature = "meshing")]
 pub mod mesh;
@@ -12,8 +12,8 @@ pub mod util;
 // Re-exports
 pub use glam;
 pub use image;
-pub use smallvec;
 pub use q1bsp_macros::*;
+pub use smallvec;
 
 /// The default quake palette.
 pub static QUAKE_PALETTE: Palette = unsafe { mem::transmute_copy(include_bytes!("../palette.lmp")) };
@@ -32,21 +32,11 @@ pub enum BspParseError {
     #[error("Lump ({0:?}) out of bounds of data! Malformed/corrupted BSP?")]
     LumpOutOfBounds(LumpEntry),
     #[error("Tried to read bytes from {from} to {to} from buffer of size {size}")]
-    BufferOutOfBounds {
-        from: usize,
-        to: usize,
-        size: usize,
-    },
+    BufferOutOfBounds { from: usize, to: usize, size: usize },
     #[error("Failed to parse string at index {index}, invalid utf-8 sequence: {sequence:?}")]
-    InvalidString {
-        index: usize,
-        sequence: Vec<u8>,
-    },
+    InvalidString { index: usize, sequence: Vec<u8> },
     #[error("Wrong magic number! Expected {expected}, found \"{}\"", display_magic_number(found))]
-    WrongMagicNumber {
-        found: [u8; 4],
-        expected: &'static str,
-    },
+    WrongMagicNumber { found: [u8; 4], expected: &'static str },
     #[error("Invalid color data, size {0} is not devisable by 3!")]
     ColorDataSizeNotDevisableBy3(usize),
     #[error("Invalid value: {value}, acceptable:\n{acceptable}")]
@@ -75,7 +65,10 @@ impl BspParseError {
 
     #[inline]
     pub fn map_utf8_error<'a>(data: &'a [u8]) -> impl FnOnce(std::str::Utf8Error) -> Self + 'a {
-        |err| BspParseError::InvalidString { index: err.valid_up_to(), sequence: data[err.valid_up_to()..err.valid_up_to() + err.error_len().unwrap_or(1)].to_vec() }
+        |err| BspParseError::InvalidString {
+            index: err.valid_up_to(),
+            sequence: data[err.valid_up_to()..err.valid_up_to() + err.error_len().unwrap_or(1)].to_vec(),
+        }
     }
 }
 
@@ -108,7 +101,10 @@ impl BspFormat {
         match &data {
             b"BSP2" => Ok(Self::BSP2),
             [0x1D, 0x00, 0x00, 0x00] => Ok(Self::BSP29),
-            _ => Err(BspParseError::WrongMagicNumber { found: data, expected: "BSP2 or 0x1D for BSP29" }),
+            _ => Err(BspParseError::WrongMagicNumber {
+                found: data,
+                expected: "BSP2 or 0x1D for BSP29",
+            }),
         }
     }
 }
@@ -136,7 +132,14 @@ impl Palette {
             return Err(BspParseError::InvalidPaletteLength(data.len()));
         }
 
-        Ok(Self { colors: data.chunks_exact(3).map(|col| [col[0], col[1], col[2]]).collect::<Vec<_>>().try_into().unwrap() })
+        Ok(Self {
+            colors: data
+                .chunks_exact(3)
+                .map(|col| [col[0], col[1], col[2]])
+                .collect::<Vec<_>>()
+                .try_into()
+                .unwrap(),
+        })
     }
 }
 
@@ -189,16 +192,20 @@ impl BspData {
     pub fn parse(input: BspParseInput) -> BspResult<Self> {
         let BspParseInput { bsp, lit } = input;
         if bsp.len() < 4 {
-            return Err(BspParseError::BufferOutOfBounds { from: 0, to: 4, size: bsp.len() });
+            return Err(BspParseError::BufferOutOfBounds {
+                from: 0,
+                to: 4,
+                size: bsp.len(),
+            });
         }
-        
+
         let ctx = BspParseContext {
             format: BspFormat::from_magic_number(bsp[0..4].try_into().unwrap())?,
         };
         let mut reader = BspByteReader::new(&bsp[4..], &ctx);
-        
+
         let lump_dir: LumpDirectory = reader.read()?;
-        
+
         let mut entities_bytes = lump_dir.entities.get(bsp)?.to_vec();
         for (i, byte) in entities_bytes.iter_mut().enumerate() {
             if *byte > 127 {
@@ -212,9 +219,12 @@ impl BspData {
         }
 
         let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
-        
+
         let data = Self {
-            entities: std::str::from_utf8(&entities_bytes).map_err(BspParseError::map_utf8_error(&entities_bytes)).job("Reading entities lump")?.to_string(),
+            entities: std::str::from_utf8(&entities_bytes)
+                .map_err(BspParseError::map_utf8_error(&entities_bytes))
+                .job("Reading entities lump")?
+                .to_string(),
             vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
             planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
             edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
@@ -254,7 +264,7 @@ impl BspData {
             let image = image::RgbImage::from_fn(texture.header.width, texture.header.height, |x, y| {
                 image::Rgb(palette.colors[data[(y * texture.header.width + x) as usize] as usize])
             });
-            
+
             (texture.header.name.as_str(), image)
         })
     }

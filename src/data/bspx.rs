@@ -1,7 +1,7 @@
 //! [BSPX](https://developer.valvesoftware.com/wiki/BSPX) data definitions.
 
-use crate::*;
 use super::*;
+use crate::*;
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
@@ -19,7 +19,10 @@ impl BspValue for BspxDirectory {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         match reader.read().and_then(|magic| {
             if &magic != b"BSPX" {
-                Err(BspParseError::WrongMagicNumber { found: magic, expected: "BSPX" })
+                Err(BspParseError::WrongMagicNumber {
+                    found: magic,
+                    expected: "BSPX",
+                })
             } else {
                 Ok(())
             }
@@ -28,7 +31,6 @@ impl BspValue for BspxDirectory {
             Err(BspParseError::BufferOutOfBounds { .. }) => return Err(BspParseError::NoBspxDirectory),
             Err(err) => return Err(err),
         }
-        
 
         let num_lumps: u32 = reader.read().job("lump count")?;
 
@@ -39,7 +41,7 @@ impl BspValue for BspxDirectory {
 
             inner.insert(entry.name, entry.entry);
         }
-        
+
         Ok(Self { inner })
     }
     fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
@@ -62,7 +64,7 @@ impl BspxData {
 
         Ok(data)
     }
-    
+
     /// Retrieves a lump entry from the directory, returns `None` if the entry does not exist.
     #[inline]
     pub fn get(&self, s: &str) -> Option<&[u8]> {
@@ -102,7 +104,8 @@ impl LightGridNode {
     // TODO what do these do?
     pub const LEAF: u32 = 1 << 31;
     pub const MISSING: u32 = 1 << 30;
-    
+
+    #[rustfmt::skip]
     pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
         self.children[
             (((point.z >= self.division_point.z as f32) as usize) << 0) |
@@ -115,7 +118,7 @@ impl LightGridNode {
 #[derive(Debug, Clone)]
 pub struct LightGridLeaf {
     pub mins: UVec3, // TODO make sure this is always positive
-    size: UVec3, // TODO make sure this is always positive
+    size: UVec3,     // TODO make sure this is always positive
 
     data: Vec<LightGridCell>,
 }
@@ -125,19 +128,14 @@ impl BspValue for LightGridLeaf {
         let size: UVec3 = reader.read().job("size")?;
 
         let mut data = Vec::with_capacity(size.element_product() as usize);
-        
+
         for _ in 0..size.element_product() {
             data.push(reader.read().job("Reading cell")?);
         }
 
-        Ok(Self {
-            mins,
-            size,
-
-            data,
-        })
+        Ok(Self { mins, size, data })
     }
-    
+
     fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
         unimplemented!("LightGridLeaf is of variable size")
     }
@@ -147,7 +145,7 @@ impl LightGridLeaf {
     pub fn cells(&self) -> &[LightGridCell] {
         &self.data
     }
-    
+
     /// Returns the index into `data` of the cell at the position specified.
     #[inline]
     pub const fn cell_idx(&self, x: u32, y: u32, z: u32) -> usize {
@@ -174,7 +172,7 @@ impl LightGridLeaf {
 pub enum LightGridCell {
     /// Cell is out of bounds. (TODO is this true?)
     Occluded,
-    /// Cell is filled, 
+    /// Cell is filled,
     Filled(SmallVec<[LightmapCellSample; 4]>),
 }
 impl BspValue for LightGridCell {
@@ -188,10 +186,10 @@ impl BspValue for LightGridCell {
         for _ in 0..style_count {
             samples.push(reader.read().job("cell sample")?);
         }
-        
+
         Ok(Self::Filled(samples))
     }
-    
+
     fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
         unimplemented!("LightGridCell is of variable size")
     }

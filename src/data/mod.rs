@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use crate::*;
 
 /// Like an [io::Cursor], but i don't have to constantly juggle buffers.
-pub struct BspByteReader<'a> { // TODO make something like "BspByteReader"
+pub struct BspByteReader<'a> {
     pub ctx: &'a BspParseContext,
     bytes: &'a [u8],
     pos: usize,
@@ -27,7 +27,11 @@ impl<'a> BspByteReader<'a> {
     pub fn read_bytes(&mut self, count: usize) -> BspResult<&[u8]> {
         let (from, to) = (self.pos, self.pos + count);
         if to > self.bytes.len() {
-            return Err(BspParseError::BufferOutOfBounds { from, to, size: self.bytes.len() });
+            return Err(BspParseError::BufferOutOfBounds {
+                from,
+                to,
+                size: self.bytes.len(),
+            });
         }
         let bytes = &self.bytes[from..to];
         self.pos += count;
@@ -36,7 +40,11 @@ impl<'a> BspByteReader<'a> {
 
     #[inline]
     pub fn with_pos(&self, pos: usize) -> Self {
-        Self { ctx: self.ctx, bytes: self.bytes, pos }
+        Self {
+            ctx: self.ctx,
+            bytes: self.bytes,
+            pos,
+        }
     }
 }
 
@@ -45,28 +53,32 @@ pub trait BspValue: Sized {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
     fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
-macro_rules! impl_bsp_parse_primitive {($ty:ty) => {
-    impl BspValue for $ty {
-        #[inline]
-        fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-            Ok(<$ty>::from_le_bytes(reader.read_bytes(size_of::<$ty>())?.try_into().unwrap()))
+macro_rules! impl_bsp_parse_primitive {
+    ($ty:ty) => {
+        impl BspValue for $ty {
+            #[inline]
+            fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+                Ok(<$ty>::from_le_bytes(reader.read_bytes(size_of::<$ty>())?.try_into().unwrap()))
+            }
+            #[inline]
+            fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+                size_of::<$ty>()
+            }
         }
-        #[inline]
-        fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-            size_of::<$ty>()
+    };
+}
+macro_rules! impl_bsp_parse_vector {
+    ($ty:ty : [$element:ty; $count:expr]) => {
+        impl BspValue for $ty {
+            fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+                Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
+            }
+            fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+                size_of::<$element>() * $count
+            }
         }
-    }
-};}
-macro_rules! impl_bsp_parse_vector {($ty:ty : [$element:ty; $count:expr]) => {
-    impl BspValue for $ty {
-        fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-            Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
-        }
-        fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-            size_of::<$element>() * $count
-        }
-    }
-};}
+    };
+}
 
 impl_bsp_parse_primitive!(u16);
 impl_bsp_parse_primitive!(u32);
@@ -152,7 +164,7 @@ pub type IBspValue = BspVariableValue<i32, i16>;
 pub struct BspVariableArray<T, N> {
     #[deref]
     #[deref_mut]
-    #[into_iterator(owned, ref,  ref_mut)]
+    #[into_iterator(owned, ref, ref_mut)]
     pub inner: Vec<T>,
     _marker: PhantomData<N>,
 }
@@ -204,10 +216,10 @@ impl<const N: usize> FixedStr<N> {
         for i in 0..s.len() {
             data[i] = s.as_bytes()[i];
         }
-        
+
         Some(Self { data })
     }
-    
+
     pub fn as_str(&self) -> &str {
         // SAFETY: This is checked when a FixedStr is created
         unsafe { std::str::from_utf8_unchecked(&self.data) }.trim_end_matches('\0')
@@ -224,7 +236,6 @@ impl<const N: usize> std::fmt::Display for FixedStr<N> {
     }
 }
 
-
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BoundingBox {
     pub min: Vec3,
@@ -237,14 +248,15 @@ pub struct ShortBoundingBox {
 }
 impl From<ShortBoundingBox> for BoundingBox {
     fn from(value: ShortBoundingBox) -> Self {
-        Self { min: value.min.as_vec3(), max: value.max.as_vec3() }
+        Self {
+            min: value.min.as_vec3(),
+            max: value.max.as_vec3(),
+        }
     }
 }
 
 /// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
 pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
-
-
 
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -264,7 +276,6 @@ impl LumpEntry {
         }
     }
 }
-
 
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
@@ -329,12 +340,12 @@ impl BspValue for LumpDirectory {
 
             bspx: BspxDirectory::default(),
         };
-        
+
         // TODO why subtract 4??
         let bspx_offset = dir.bsp_entries().into_iter().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
         match reader.with_pos(bspx_offset as usize).read() {
             Ok(bspx_dir) => dir.bspx = bspx_dir,
-            Err(BspParseError::NoBspxDirectory) => {},
+            Err(BspParseError::NoBspxDirectory) => {}
             Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
         }
 
@@ -344,8 +355,6 @@ impl BspValue for LumpDirectory {
         unimplemented!("LumpDirectory is of variable size")
     }
 }
-
-
 
 #[test]
 fn fixed_str_from_str() {

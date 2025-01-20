@@ -1,7 +1,7 @@
 //! BSP data definitions.
 
-use crate::*;
 use super::*;
+use crate::*;
 
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspEdge {
@@ -15,7 +15,7 @@ pub struct BspEdge {
 /// - 255 means there is no lightmap.
 /// - 0 means normal, unanimated lightmap.
 /// - 1 through 254 are programmer-defined animated styles, including togglable lights. In Quake though, 1 produces a fast pulsating light, and 2 produces a slow pulsating light, so those might be good defaults.
-/// 
+///
 /// It is recommended to compare these values via the provided methods and constants of this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LightmapStyle(pub u8);
@@ -45,7 +45,6 @@ impl std::fmt::Display for LightmapStyle {
     }
 }
 
-
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspFace {
     /// Index of the plane the face is parallel to
@@ -62,9 +61,9 @@ pub struct BspFace {
     pub texture_info_idx: UBspValue,
 
     /// Each face can have up to 4 lightmaps, the additional 3 are positioned right after the lightmap at `lightmap_offset`.
-    /// 
+    ///
     /// Each element in this array is the style in which these lightmaps appear, see docs for [LightmapStyle].
-    /// 
+    ///
     /// You can also short-circuit when looping through these styles, if `lightmap_styles[2]` is 255, there isn't a possibility that `lightmap_styles[3]` isn't.
     pub lightmap_styles: [LightmapStyle; 4],
 
@@ -156,7 +155,7 @@ pub struct BspNode {
 
     pub front: IBspValue,
     pub back: IBspValue,
-    
+
     /// Bounding box of the node and all its children.
     pub bound: VariableBoundingBox,
     /// Index of the first [BspFace] the node contains.
@@ -172,8 +171,8 @@ pub enum BspTreeLeafContents {
     Solid = -2,
     Water = -3,
     Slime = -4,
-    Lava  = -5,
-    Sky   = -6,
+    Lava = -5,
+    Sky = -6,
     // Origin = -7, removed at csg time
     // Clip = -8, changed to contents_solid
     Current0 = -9,
@@ -210,12 +209,19 @@ impl BspValue for BspTexture {
         // TODO animated textures and the like
         let start_pos = reader.pos;
         let header: BspTextureHeader = reader.read()?;
-        
+
         // From my testing, it seems the data starts at the end of the header, but this is just making sure
         reader.pos = start_pos + header.offset_full as usize;
 
-        let data = if header.offset_full == 0 { None } else {
-            Some(reader.read_bytes(header.width as usize * header.height as usize).job(format!("Reading texture with header {header:#?}"))?.to_vec())
+        let data = if header.offset_full == 0 {
+            None
+        } else {
+            Some(
+                reader
+                    .read_bytes(header.width as usize * header.height as usize)
+                    .job(format!("Reading texture with header {header:#?}"))?
+                    .to_vec(),
+            )
         };
 
         Ok(Self { header, data })
@@ -238,9 +244,12 @@ pub struct BspTextureHeader {
     pub height: u32,
 
     pub offset_full: u32,
-    #[allow(unused)] pub offset_half: u32,
-    #[allow(unused)] pub offset_quarter: u32,
-    #[allow(unused)] pub offset_eighth: u32,
+    #[allow(unused)]
+    pub offset_half: u32,
+    #[allow(unused)]
+    pub offset_quarter: u32,
+    #[allow(unused)]
+    pub offset_eighth: u32,
 }
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.
@@ -253,13 +262,16 @@ impl BspLighting {
     /// Parses colored lighting from a LIT file.
     pub fn read_lit(data: &[u8], ctx: &BspParseContext, ignore_header: bool) -> BspResult<Self> {
         let mut reader = BspByteReader::new(data, ctx);
-        
+
         if !ignore_header {
             let magic: [u8; 4] = reader.read()?;
             if &magic != b"QLIT" {
-                return Err(BspParseError::WrongMagicNumber { found: magic, expected: "QLIT" });
+                return Err(BspParseError::WrongMagicNumber {
+                    found: magic,
+                    expected: "QLIT",
+                });
             }
-    
+
             let _version: i32 = reader.read()?;
         }
 
@@ -277,7 +289,7 @@ impl BspLighting {
             Self::White(v) => {
                 let v = *v.get(i)?;
                 Some([v, v, v])
-            },
+            }
             Self::Colored(v) => v.get(i).copied(),
         }
     }

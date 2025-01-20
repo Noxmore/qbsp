@@ -34,7 +34,7 @@ pub struct MeshModelOutput {
 impl BspData {
     // TODO I would like this to be more powerful, being able to change things like where meshes split and such would be nice, but i can't think of a good API for it.
     //      Also, support vis data.
-    
+
     /// Meshes a model at the specified index. Returns one mesh for each texture used in the model.
     pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&LightmapUvMap>) -> MeshModelOutput {
         let model = &self.models[model_idx];
@@ -47,7 +47,10 @@ impl BspData {
             let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
             let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
 
-            grouped_faces.entry((texture.header.name.as_str(), tex_info.flags)).or_default().push((i, face));
+            grouped_faces
+                .entry((texture.header.name.as_str(), tex_info.flags))
+                .or_default()
+                .push((i, face));
         }
 
         let mut meshes = Vec::with_capacity(grouped_faces.len());
@@ -59,13 +62,13 @@ impl BspData {
 
             for (face_idx, face) in faces {
                 mesh.faces.push(face_idx);
-                
+
                 let plane = &self.planes[face.plane_idx.bsp2() as usize];
                 let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
-                let texture_size = self.textures[tex_info.texture_idx as usize].as_ref()
+                let texture_size = self.textures[tex_info.texture_idx as usize]
+                    .as_ref()
                     .map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
                     .unwrap_or(Vec2::ONE);
-
 
                 // The uv coordinates of the face's lightmap in the world, rather than on a lightmap atlas
                 let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.bsp2() as usize);
@@ -95,23 +98,24 @@ impl BspData {
                     }
                 }
             }
-            
+
             meshes.push(mesh);
         }
-        
+
         MeshModelOutput { meshes }
     }
 }
 
 /// Calculates a world UV coordinate from a position and texture info.
-/// 
+///
 /// Converts to double for calculation to minimise floating-point imprecision as demonstrated [here](https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315).
 #[inline]
 pub fn world_uv(pos: Vec3, tex_info: &BspTexInfo) -> Vec2 {
     dvec2(
         pos.as_dvec3().dot(tex_info.u_axis.as_dvec3()) + tex_info.u_offset as f64,
         pos.as_dvec3().dot(tex_info.v_axis.as_dvec3()) + tex_info.v_offset as f64,
-    ).as_vec2()
+    )
+    .as_vec2()
 }
 
 /// Computes the index into [BspLighting] for the specific face specified.
@@ -124,7 +128,7 @@ pub fn compute_lighting_index(face: &BspFace, extents: &FaceExtents, light_style
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FaceExtents {
     face_rect: Rect<Vec2>,
-    
+
     lightmap_rect: Rect<IVec2>,
     lightmap_size: UVec2,
     lightmap_pixels: u32,
@@ -133,7 +137,7 @@ impl FaceExtents {
     /// Calculates face extents from unscaled UVs.
     pub fn new(uvs: impl IntoIterator<Item = Vec2>) -> Self {
         let mut extents = Self::default();
-        
+
         extents.face_rect = Rect::EMPTY;
         for uv in uvs {
             extents.face_rect = extents.face_rect.union_point(uv);
