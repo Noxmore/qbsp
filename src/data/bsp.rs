@@ -131,8 +131,28 @@ pub struct BspModel {
 pub struct BspPlane {
     pub normal: Vec3,
     pub dist: f32,
-    /// Not really sure what this is, not used anywhere
-    pub ty: u32,
+    /// Type of plane depending on normal vector.
+    pub ty: BspPlaneType,
+}
+
+/// Type of plane depending on normal vector.
+/// 
+/// Referenced from [this specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL1).
+#[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum BspPlaneType {
+    /// Axial plane, in X
+    AxialX = 0,
+    /// Axial plane, in Y
+    AxialY = 1,
+    /// Axial plane, in Z
+    AxialZ = 2,
+    /// Non axial plane, roughly toward X
+    AroundX = 3,
+    /// Non axial plane, roughly toward Y
+    AroundY = 4,
+    /// Non axial plane, roughly toward Z
+    AroundZ = 5,
 }
 
 /// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
