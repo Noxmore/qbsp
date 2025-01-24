@@ -168,9 +168,10 @@ pub struct BspNode {
     pub face_num: UBspValue,
 }
 
-#[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
 pub enum BspTreeLeafContents {
+    Node(i32) = 0,
     Empty = -1,
     Solid = -2,
     Water = -3,
@@ -185,6 +186,29 @@ pub enum BspTreeLeafContents {
     Current270 = -12,
     CurrentUp = -13,
     CurrentDown = -14,
+}
+impl BspValue for BspTreeLeafContents {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        i32::bsp_parse(reader).map(|i| match i {
+            -1 => Self::Empty,
+            -2 => Self::Solid,
+            -3 => Self::Water,
+            -4 => Self::Slime,
+            -5 => Self::Lava,
+            -6 => Self::Sky,
+            -9 => Self::Current0,
+            -10 => Self::Current90,
+            -11 => Self::Current180,
+            -12 => Self::Current270,
+            -13 => Self::CurrentUp,
+            -14 => Self::CurrentDown,
+            i => Self::Node(i),
+        })
+    }
+
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        size_of::<i32>()
+    }
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
