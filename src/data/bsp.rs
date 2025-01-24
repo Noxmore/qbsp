@@ -177,8 +177,8 @@ pub struct BspNode {
     /// Index of the [BspPlane] that splits the node.
     pub plane_idx: u32,
 
-    pub front: IBspValue,
-    pub back: IBspValue,
+    pub front: BspNodeChild,
+    pub back: BspNodeChild,
 
     /// Bounding box of the node and all its children.
     pub bound: VariableBoundingBox,
@@ -186,6 +186,27 @@ pub struct BspNode {
     pub face_idx: UBspValue,
     /// Number of faces this node contains.
     pub face_num: UBspValue,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BspNodeChild {
+    // TODO referenced from https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL5, i think bit15 means the sign bit, and that 1 is negative, but i could be totally wrong
+    Node(u32),
+    Leaf(u32),
+}
+impl BspValue for BspNodeChild {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        let value = IBspValue::bsp_parse(reader)?;
+
+        Ok(if value.bsp2().is_negative() {
+            Self::Leaf(value.bsp2() as u32)
+        } else {
+            Self::Node(value.bsp2() as u32)
+        })
+    }
+    fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+        IBspValue::bsp_struct_size(ctx)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
