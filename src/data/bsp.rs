@@ -115,7 +115,11 @@ pub struct BspModel {
     /// Origin of model, usually (0,0,0)
     pub origin: Vec3,
 
-    pub head_node: [u32; 4],
+    pub head_bsp_node: u32,
+    pub first_clip_node: u32,
+    pub second_clip_node: u32,
+    /// [The specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BLE) notes this as "usually zero".
+    pub node_id3: u32,
 
     /// Number of visleafs not including the solid leaf 0
     pub visleafs: u32,
