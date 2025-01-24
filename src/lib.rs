@@ -176,7 +176,7 @@ pub struct BspData {
     pub faces: Vec<BspFace>,
     pub lighting: Option<BspLighting>,
     // TODO clip_nodes
-    // TODO leaves
+    pub leaves: Vec<BspTreeLeaf>,
     // TODO mark_surfaces
     pub edges: Vec<BspEdge>,
     pub surface_edges: Vec<i32>,
@@ -225,15 +225,12 @@ impl BspData {
                 .map_err(BspParseError::map_utf8_error(&entities_bytes))
                 .job("Reading entities lump")?
                 .to_string(),
-            vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
             planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
-            edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
-            surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
-            faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
-            tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
-            models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
-            nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
             textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
+            vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
+            nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
+            tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
+            faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
             lighting: if let Some(lit) = lit {
                 Some(BspLighting::read_lit(lit, &ctx, false).job("Parsing .lit file")?)
             } else if let Some(lighting) = bspx.parse_rgb_lighting(&ctx) {
@@ -247,6 +244,10 @@ impl BspData {
                     Some(BspLighting::White(lighting.to_vec()))
                 }
             },
+            leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
+            edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
+            surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
+            models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
 
             bspx,
 
