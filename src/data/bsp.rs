@@ -134,6 +134,12 @@ pub struct BspPlane {
     /// Type of plane depending on normal vector.
     pub ty: BspPlaneType,
 }
+impl BspPlane {
+    /// `>0` = front, `<0` = back, `0` = on plane
+    pub fn point_side(&self, point: Vec3) -> f32 {
+        (self.normal.as_dvec3().dot(point.as_dvec3()) - self.dist as f64) as f32
+    }
+}
 
 /// Type of plane depending on normal vector.
 /// 
