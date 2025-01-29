@@ -7,6 +7,7 @@ pub(crate) use data::{bsp::*, bspx::*, *};
 #[cfg(feature = "meshing")]
 pub mod mesh;
 
+pub mod raycast;
 pub mod util;
 
 // Re-exports

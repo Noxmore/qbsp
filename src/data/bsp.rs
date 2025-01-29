@@ -115,11 +115,11 @@ pub struct BspModel {
     /// Origin of model, usually (0,0,0)
     pub origin: Vec3,
 
-    pub head_bsp_node: u32,
-    pub first_clip_node: u32,
-    pub second_clip_node: u32,
+    pub head_bsp_node: BspNodeRef,
+    pub first_clip_node: BspNodeRef,
+    pub second_clip_node: BspNodeRef,
     /// [The specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BLE) notes this as "usually zero".
-    pub node_id3: u32,
+    pub node_id3: BspNodeRef,
 
     /// Number of visleafs not including the solid leaf 0
     pub visleafs: u32,
@@ -137,12 +137,19 @@ pub struct BspPlane {
 impl BspPlane {
     /// `>0` = front, `<0` = back, `0` = on plane
     pub fn point_side(&self, point: Vec3) -> f32 {
-        (self.normal.as_dvec3().dot(point.as_dvec3()) - self.dist as f64) as f32
+        let plane_axis = self.ty as usize;
+
+        // If the plane lies on a cardinal axis, the computation is much simpler.
+        if plane_axis < 3 {
+            point[plane_axis] - self.dist
+        } else {
+            (self.normal.as_dvec3().dot(point.as_dvec3()) - self.dist as f64) as f32
+        }
     }
 }
 
 /// Type of plane depending on normal vector.
-/// 
+///
 /// Referenced from [this specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL1).
 #[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -183,8 +190,8 @@ pub struct BspNode {
     /// Index of the [BspPlane] that splits the node.
     pub plane_idx: u32,
 
-    pub front: BspNodeChild,
-    pub back: BspNodeChild,
+    pub front: VariableBspNodeRef,
+    pub back: VariableBspNodeRef,
 
     /// Bounding box of the node and all its children.
     pub bound: VariableBoundingBox,
@@ -194,31 +201,48 @@ pub struct BspNode {
     pub face_num: UBspValue,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum BspNodeChild {
-    // TODO referenced from https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL5, i think bit15 means the sign bit, and that 1 is negative, but i could be totally wrong
+/// A reference to a [BspNode]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BspNodeRef {
     Node(u32),
     Leaf(u32),
 }
-impl BspValue for BspNodeChild {
+impl BspNodeRef {
+    pub fn from_i32(value: i32) -> Self {
+        if value.is_negative() {
+            Self::Leaf((-value) as u32 - 1) // - 1 because you can't have -0
+        } else {
+            Self::Node(value as u32)
+        }
+    }
+}
+impl BspValue for BspNodeRef {
+    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+        Ok(Self::from_i32(reader.read()?))
+    }
+    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+        size_of::<i32>()
+    }
+}
+
+/// Wrapper over [BspNodeRef] that reads a [IBspValue] instead of an `i32`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VariableBspNodeRef(pub BspNodeRef);
+impl BspValue for VariableBspNodeRef {
     fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
         let value = IBspValue::bsp_parse(reader)?;
 
-        Ok(if value.bsp2().is_negative() {
-            Self::Leaf(value.bsp2() as u32)
-        } else {
-            Self::Node(value.bsp2() as u32)
-        })
+        Ok(Self(BspNodeRef::from_i32(value.bsp2())))
     }
     fn bsp_struct_size(ctx: &BspParseContext) -> usize {
         IBspValue::bsp_struct_size(ctx)
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(i32)]
 pub enum BspTreeLeafContents {
-    Node(i32) = 0,
+    #[default]
     Empty = -1,
     Solid = -2,
     Water = -3,
@@ -233,29 +257,6 @@ pub enum BspTreeLeafContents {
     Current270 = -12,
     CurrentUp = -13,
     CurrentDown = -14,
-}
-impl BspValue for BspTreeLeafContents {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        i32::bsp_parse(reader).map(|i| match i {
-            -1 => Self::Empty,
-            -2 => Self::Solid,
-            -3 => Self::Water,
-            -4 => Self::Slime,
-            -5 => Self::Lava,
-            -6 => Self::Sky,
-            -9 => Self::Current0,
-            -10 => Self::Current90,
-            -11 => Self::Current180,
-            -12 => Self::Current270,
-            -13 => Self::CurrentUp,
-            -14 => Self::CurrentDown,
-            i => Self::Node(i),
-        })
-    }
-
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        size_of::<i32>()
-    }
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
