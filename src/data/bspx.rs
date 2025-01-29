@@ -7,106 +7,106 @@ pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspxLumpEntry {
-    pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
-    pub entry: LumpEntry,
+	pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
+	pub entry: LumpEntry,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct BspxDirectory {
-    pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
+	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
 }
 impl BspValue for BspxDirectory {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        match reader.read().and_then(|magic| {
-            if &magic != b"BSPX" {
-                Err(BspParseError::WrongMagicNumber {
-                    found: magic,
-                    expected: "BSPX",
-                })
-            } else {
-                Ok(())
-            }
-        }) {
-            Ok(()) => {}
-            Err(BspParseError::BufferOutOfBounds { .. }) => return Err(BspParseError::NoBspxDirectory),
-            Err(err) => return Err(err),
-        }
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		match reader.read().and_then(|magic| {
+			if &magic != b"BSPX" {
+				Err(BspParseError::WrongMagicNumber {
+					found: magic,
+					expected: "BSPX",
+				})
+			} else {
+				Ok(())
+			}
+		}) {
+			Ok(()) => {}
+			Err(BspParseError::BufferOutOfBounds { .. }) => return Err(BspParseError::NoBspxDirectory),
+			Err(err) => return Err(err),
+		}
 
-        let num_lumps: u32 = reader.read().job("lump count")?;
+		let num_lumps: u32 = reader.read().job("lump count")?;
 
-        let mut inner = HashMap::new();
+		let mut inner = HashMap::new();
 
-        for i in 0..num_lumps {
-            let entry: BspxLumpEntry = reader.read().job(format!("lump entry {i}/{num_lumps}"))?;
+		for i in 0..num_lumps {
+			let entry: BspxLumpEntry = reader.read().job(format!("lump entry {i}/{num_lumps}"))?;
 
-            inner.insert(entry.name, entry.entry);
-        }
+			inner.insert(entry.name, entry.entry);
+		}
 
-        Ok(Self { inner })
-    }
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        unimplemented!("BspxDirectory is of variable size")
-    }
+		Ok(Self { inner })
+	}
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		unimplemented!("BspxDirectory is of variable size")
+	}
 }
 
 /// Owned version of [BspxDirectory]. Convert via [BspxData::new].
 #[derive(Debug, Clone, Default)]
 pub struct BspxData {
-    pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Box<[u8]>>,
+	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Box<[u8]>>,
 }
 impl BspxData {
-    pub fn new(bsp: &[u8], dir: &BspxDirectory) -> BspResult<Self> {
-        let mut data = Self::default();
+	pub fn new(bsp: &[u8], dir: &BspxDirectory) -> BspResult<Self> {
+		let mut data = Self::default();
 
-        for (name, entry) in &dir.inner {
-            data.inner.insert(*name, entry.get(bsp)?.into());
-        }
+		for (name, entry) in &dir.inner {
+			data.inner.insert(*name, entry.get(bsp)?.into());
+		}
 
-        Ok(data)
-    }
+		Ok(data)
+	}
 
-    /// Retrieves a lump entry from the directory, returns `None` if the entry does not exist.
-    #[inline]
-    pub fn get(&self, s: &str) -> Option<&[u8]> {
-        self.inner.get(&FixedStr::from_str(s)?).map(|v| &**v)
-    }
+	/// Retrieves a lump entry from the directory, returns `None` if the entry does not exist.
+	#[inline]
+	pub fn get(&self, s: &str) -> Option<&[u8]> {
+		self.inner.get(&FixedStr::from_str(s)?).map(|v| &**v)
+	}
 
-    /// Parses the `RGBLIGHTING` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-    pub fn parse_rgb_lighting(&self, ctx: &BspParseContext) -> Option<BspResult<BspLighting>> {
-        Some(BspLighting::read_lit(self.get("RGBLIGHTING")?, ctx, true).job("Parsing RGBLIGHTING BSPX lump"))
-    }
+	/// Parses the `RGBLIGHTING` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	pub fn parse_rgb_lighting(&self, ctx: &BspParseContext) -> Option<BspResult<BspLighting>> {
+		Some(BspLighting::read_lit(self.get("RGBLIGHTING")?, ctx, true).job("Parsing RGBLIGHTING BSPX lump"))
+	}
 
-    /// Parses the `LIGHTGRID_OCTREE` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-    pub fn parse_light_grid_octree(&self, ctx: &BspParseContext) -> Option<BspResult<LightGridOctree>> {
-        let mut reader = BspByteReader::new(self.get("LIGHTGRID_OCTREE")?, ctx);
-        Some(reader.read().job("Parsing LIGHTGRID_OCTREE BSPX lump"))
-    }
+	/// Parses the `LIGHTGRID_OCTREE` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	pub fn parse_light_grid_octree(&self, ctx: &BspParseContext) -> Option<BspResult<LightGridOctree>> {
+		let mut reader = BspByteReader::new(self.get("LIGHTGRID_OCTREE")?, ctx);
+		Some(reader.read().job("Parsing LIGHTGRID_OCTREE BSPX lump"))
+	}
 }
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
 #[derive(BspValue, Debug, Clone)]
 pub struct LightGridOctree {
-    pub step: Vec3,
-    pub size: UVec3, // TODO make sure this is always positive
-    pub mins: Vec3,
-    pub num_styles: u8,
-    pub root_idx: u32,
-    pub nodes: BspVariableArray<LightGridNode, u32>,
-    pub leafs: BspVariableArray<LightGridLeaf, u32>,
+	pub step: Vec3,
+	pub size: UVec3, // TODO make sure this is always positive
+	pub mins: Vec3,
+	pub num_styles: u8,
+	pub root_idx: u32,
+	pub nodes: BspVariableArray<LightGridNode, u32>,
+	pub leafs: BspVariableArray<LightGridLeaf, u32>,
 }
 
 #[derive(BspValue, Debug, Clone)]
 pub struct LightGridNode {
-    pub division_point: UVec3,
-    pub children: [u32; 8],
+	pub division_point: UVec3,
+	pub children: [u32; 8],
 }
 impl LightGridNode {
-    // TODO what do these do?
-    pub const LEAF: u32 = 1 << 31;
-    pub const MISSING: u32 = 1 << 30;
+	// TODO what do these do?
+	pub const LEAF: u32 = 1 << 31;
+	pub const MISSING: u32 = 1 << 30;
 
     #[rustfmt::skip]
-    pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
+	pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
         self.children[
             (((point.z >= self.division_point.z as f32) as usize) << 0) |
             (((point.y >= self.division_point.y as f32) as usize) << 1) |
@@ -117,86 +117,86 @@ impl LightGridNode {
 
 #[derive(Debug, Clone)]
 pub struct LightGridLeaf {
-    pub mins: UVec3, // TODO make sure this is always positive
-    size: UVec3,     // TODO make sure this is always positive
+	pub mins: UVec3, // TODO make sure this is always positive
+	size: UVec3,     // TODO make sure this is always positive
 
-    data: Vec<LightGridCell>,
+	data: Vec<LightGridCell>,
 }
 impl BspValue for LightGridLeaf {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        let mins: UVec3 = reader.read().job("position")?;
-        let size: UVec3 = reader.read().job("size")?;
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let mins: UVec3 = reader.read().job("position")?;
+		let size: UVec3 = reader.read().job("size")?;
 
-        let mut data = Vec::with_capacity(size.element_product() as usize);
+		let mut data = Vec::with_capacity(size.element_product() as usize);
 
-        for _ in 0..size.element_product() {
-            data.push(reader.read().job("Reading cell")?);
-        }
+		for _ in 0..size.element_product() {
+			data.push(reader.read().job("Reading cell")?);
+		}
 
-        Ok(Self { mins, size, data })
-    }
+		Ok(Self { mins, size, data })
+	}
 
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        unimplemented!("LightGridLeaf is of variable size")
-    }
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		unimplemented!("LightGridLeaf is of variable size")
+	}
 }
 impl LightGridLeaf {
-    #[inline]
-    pub fn cells(&self) -> &[LightGridCell] {
-        &self.data
-    }
+	#[inline]
+	pub fn cells(&self) -> &[LightGridCell] {
+		&self.data
+	}
 
-    /// Returns the index into `data` of the cell at the position specified.
-    #[inline]
-    pub const fn cell_idx(&self, x: u32, y: u32, z: u32) -> usize {
-        ((z * self.size.x * self.size.y) + (y * self.size.x) + x) as usize
-    }
+	/// Returns the index into `data` of the cell at the position specified.
+	#[inline]
+	pub const fn cell_idx(&self, x: u32, y: u32, z: u32) -> usize {
+		((z * self.size.x * self.size.y) + (y * self.size.x) + x) as usize
+	}
 
-    /// Returns the cell at the specified position, panics if the position is out of bounds.
-    pub fn get_cell(&self, x: u32, y: u32, z: u32) -> &LightGridCell {
-        &self.data[self.cell_idx(x, y, z)]
-    }
-    /// Returns the cell at the specified position, panics if the position is out of bounds.
-    pub fn get_cell_mut(&mut self, x: u32, y: u32, z: u32) -> &mut LightGridCell {
-        let idx = self.cell_idx(x, y, z);
-        &mut self.data[idx]
-    }
+	/// Returns the cell at the specified position, panics if the position is out of bounds.
+	pub fn get_cell(&self, x: u32, y: u32, z: u32) -> &LightGridCell {
+		&self.data[self.cell_idx(x, y, z)]
+	}
+	/// Returns the cell at the specified position, panics if the position is out of bounds.
+	pub fn get_cell_mut(&mut self, x: u32, y: u32, z: u32) -> &mut LightGridCell {
+		let idx = self.cell_idx(x, y, z);
+		&mut self.data[idx]
+	}
 
-    #[inline]
-    pub const fn size(&self) -> UVec3 {
-        self.size
-    }
+	#[inline]
+	pub const fn size(&self) -> UVec3 {
+		self.size
+	}
 }
 
 #[derive(Debug, Clone)]
 pub enum LightGridCell {
-    /// Cell is out of bounds. (TODO is this true?)
-    Occluded,
-    /// Cell is filled,
-    Filled(SmallVec<[LightmapCellSample; 4]>),
+	/// Cell is out of bounds. (TODO is this true?)
+	Occluded,
+	/// Cell is filled,
+	Filled(SmallVec<[LightmapCellSample; 4]>),
 }
 impl BspValue for LightGridCell {
-    fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-        let style_count: u8 = reader.read().job("style count")?;
-        if style_count == 255 {
-            return Ok(Self::Occluded);
-        }
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let style_count: u8 = reader.read().job("style count")?;
+		if style_count == 255 {
+			return Ok(Self::Occluded);
+		}
 
-        let mut samples = SmallVec::with_capacity(style_count as usize);
-        for _ in 0..style_count {
-            samples.push(reader.read().job("cell sample")?);
-        }
+		let mut samples = SmallVec::with_capacity(style_count as usize);
+		for _ in 0..style_count {
+			samples.push(reader.read().job("cell sample")?);
+		}
 
-        Ok(Self::Filled(samples))
-    }
+		Ok(Self::Filled(samples))
+	}
 
-    fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-        unimplemented!("LightGridCell is of variable size")
-    }
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		unimplemented!("LightGridCell is of variable size")
+	}
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct LightmapCellSample {
-    pub style: LightmapStyle,
-    pub color: [u8; 3],
+	pub style: LightmapStyle,
+	pub color: [u8; 3],
 }
