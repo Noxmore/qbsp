@@ -12,6 +12,10 @@ pub struct RaycastImpact {
 	pub fraction: f32,
 	pub position: Vec3,
 	pub normal: Vec3,
+
+	/// The index of the node containing the surface that was hit.
+	pub node_idx: u32,
+	
 	// TODO Perhaps we also want to return the face it impacted?
 }
 
@@ -120,6 +124,7 @@ impl BspData {
 					fraction: ((real_mid - ctx.start) / (ctx.end - ctx.start)).element_sum() / 3.,
 					position: real_mid,
 					normal: if front_side { -plane.normal } else { plane.normal },
+					node_idx: node_idx,
 				};
 
 				// The other side of the node is solid, this is the impact point
