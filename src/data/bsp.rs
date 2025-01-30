@@ -241,7 +241,7 @@ impl BspValue for VariableBspNodeRef {
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(i32)]
-pub enum BspTreeLeafContents {
+pub enum BspLeafContents {
 	#[default]
 	Empty = -1,
 	Solid = -2,
@@ -260,8 +260,8 @@ pub enum BspTreeLeafContents {
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
-pub struct BspTreeLeaf {
-	pub contents: BspTreeLeafContents,
+pub struct BspLeaf {
+	pub contents: BspLeafContents,
 	pub vis_list: u32,
 
 	pub bound: VariableBoundingBox,

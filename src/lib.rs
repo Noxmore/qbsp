@@ -177,7 +177,7 @@ pub struct BspData {
 	pub faces: Vec<BspFace>,
 	pub lighting: Option<BspLighting>,
 	// TODO clip_nodes
-	pub leaves: Vec<BspTreeLeaf>,
+	pub leaves: Vec<BspLeaf>,
 	// TODO mark_surfaces
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
