@@ -1,5 +1,7 @@
 use crate::*;
 
+
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RaycastResult {
 	pub impact: Option<RaycastImpact>,
@@ -20,10 +22,13 @@ pub struct RaycastImpact {
 }
 
 impl BspData {
-	/// Returns the index of the BSP leaf `point` is on of `model`.
+	/// Returns the index of the BSP leaf `point` is in of `model`.
 	pub fn leaf_at_point(&self, model_idx: usize, point: Vec3) -> usize {
-		let mut node_ref = self.models[model_idx].head_bsp_node;
+		self.leaf_at_point_in_node(self.models[model_idx].head_bsp_node, point)
+	}
 
+	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [Self::leaf_at_point].
+	pub fn leaf_at_point_in_node(&self, mut node_ref: BspNodeRef, point: Vec3) -> usize {
 		loop {
 			match node_ref {
 				BspNodeRef::Leaf(leaf_idx) => return leaf_idx as usize,
@@ -57,12 +62,10 @@ impl BspData {
 
 		let model = self.models[model_idx];
 
-		// Not really necessary, keeps arg count from getting too high
 		struct Ctx<'a> {
 			start: Vec3,
 			end: Vec3,
 			data: &'a BspData,
-			model_idx: usize,
 		}
 
 		fn internal(ctx: &Ctx, mut node_ref: BspNodeRef, from: Vec3, to: Vec3) -> RaycastResult {
@@ -109,7 +112,7 @@ impl BspData {
 				}
 
 				// Sort of hacky, but this is what Quake's implementation does, so i guess it's fine.
-				let mid_leaf_idx = ctx.data.leaf_at_point(ctx.model_idx, mid);
+				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { node.back.0 } else { node.front.0 }, mid);
 				if ctx.data.leaves[mid_leaf_idx].contents != BspLeafContents::Solid {
 					return internal(ctx, if front_side { node.back.0 } else { node.front.0 }, mid, to);
 				}
@@ -139,7 +142,6 @@ impl BspData {
 			start: from,
 			end: to,
 			data: self,
-			model_idx,
 		};
 
 		internal(&ctx, model.head_bsp_node, from, to)
