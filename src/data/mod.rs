@@ -3,7 +3,7 @@
 pub mod bsp;
 pub mod bspx;
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, str::FromStr};
 
 use crate::*;
 
@@ -110,8 +110,8 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		// Look ma, no heap allocations!
 		let mut out = [(); N].map(|_| mem::MaybeUninit::uninit());
-		for i in 0..N {
-			out[i].write(reader.read()?);
+		for out in out.iter_mut() {
+			out.write(reader.read()?);
 		}
 		Ok(out.map(|v| unsafe { v.assume_init() }))
 	}
@@ -206,20 +206,6 @@ impl<const N: usize> FixedStr<N> {
 		Ok(Self { data })
 	}
 
-	/// Constructs a `FixedStr` from a rust `&str`, returns `None` if the supplied string's length is more than `N`.
-	#[inline]
-	pub fn from_str(s: &str) -> Option<Self> {
-		if s.len() > N {
-			return None;
-		}
-		let mut data = [0; N];
-		for i in 0..s.len() {
-			data[i] = s.as_bytes()[i];
-		}
-
-		Some(Self { data })
-	}
-
 	pub fn as_str(&self) -> &str {
 		// SAFETY: This is checked when a FixedStr is created
 		unsafe { std::str::from_utf8_unchecked(&self.data) }.trim_end_matches('\0')
@@ -233,6 +219,23 @@ impl<const N: usize> std::fmt::Debug for FixedStr<N> {
 impl<const N: usize> std::fmt::Display for FixedStr<N> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.as_str().fmt(f)
+	}
+}
+impl<const N: usize> FromStr for FixedStr<N> {
+	type Err = ();
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		if s.len() > N {
+			return Err(());
+		}
+		let mut data = [0; N];
+		
+		#[allow(clippy::manual_memcpy)]
+		for i in 0..s.len() {
+			data[i] = s.as_bytes()[i];
+		}
+
+		Ok(Self { data })
 	}
 }
 
@@ -358,6 +361,6 @@ impl BspValue for LumpDirectory {
 
 #[test]
 fn fixed_str_from_str() {
-	assert!(FixedStr::<8>::from_str("12345678").is_some());
-	assert!(FixedStr::<8>::from_str("123456789").is_none());
+	assert!(FixedStr::<8>::from_str("12345678").is_ok());
+	assert!(FixedStr::<8>::from_str("123456789").is_err());
 }

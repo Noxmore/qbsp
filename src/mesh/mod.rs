@@ -56,7 +56,9 @@ impl BspData {
 		let mut meshes = Vec::with_capacity(grouped_faces.len());
 
 		for ((texture, tex_flags), faces) in grouped_faces {
-			let mut mesh = ExportedMesh::default();
+			let mut mesh = ExportedMesh {
+				..Default::default()
+			};
 			mesh.texture = texture.to_string();
 			mesh.tex_flags = tex_flags;
 
@@ -136,9 +138,11 @@ pub struct FaceExtents {
 impl FaceExtents {
 	/// Calculates face extents from unscaled UVs.
 	pub fn new(uvs: impl IntoIterator<Item = Vec2>) -> Self {
-		let mut extents = Self::default();
+		let mut extents = Self {
+			face_rect: Rect::EMPTY,
+			..Default::default()
+		};
 
-		extents.face_rect = Rect::EMPTY;
 		for uv in uvs {
 			extents.face_rect = extents.face_rect.union_point(uv);
 		}

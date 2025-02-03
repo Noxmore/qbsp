@@ -77,7 +77,7 @@ impl BspFace {
 	pub fn vertices<'a>(&self, bsp: &'a BspData) -> impl Iterator<Item = Vec3> + 'a {
 		(self.first_edge..self.first_edge + self.num_edges.bsp2()).map(|i| {
 			let surf_edge = bsp.surface_edges[i as usize];
-			let edge = bsp.edges[surf_edge.abs() as usize];
+			let edge = bsp.edges[surf_edge.unsigned_abs() as usize];
 			let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
 
 			bsp.vertices[vert_idx.0.bsp2() as usize]
@@ -376,6 +376,11 @@ impl BspLighting {
 			Self::White(vec) => vec.len(),
 			Self::Colored(vec) => vec.len(),
 		}
+	}
+
+	#[inline]
+	pub fn is_empty(&self) -> bool {
+		self.len() == 0
 	}
 }
 impl std::fmt::Debug for BspLighting {

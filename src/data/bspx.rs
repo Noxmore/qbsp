@@ -68,7 +68,7 @@ impl BspxData {
 	/// Retrieves a lump entry from the directory, returns `None` if the entry does not exist.
 	#[inline]
 	pub fn get(&self, s: &str) -> Option<&[u8]> {
-		self.inner.get(&FixedStr::from_str(s)?).map(|v| &**v)
+		self.inner.get(&FixedStr::from_str(s).ok()?).map(|v| &**v)
 	}
 
 	/// Parses the `RGBLIGHTING` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
@@ -106,6 +106,7 @@ impl LightGridNode {
 	pub const MISSING: u32 = 1 << 30;
 
     #[rustfmt::skip]
+	#[allow(clippy::identity_op)]
 	pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
         self.children[
             (((point.z >= self.division_point.z as f32) as usize) << 0) |

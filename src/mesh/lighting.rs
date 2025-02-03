@@ -188,7 +188,7 @@ impl BspData {
 		};
 
 		// Normalize lightmap UVs from texture space
-		for (_, uvs) in &mut lightmap_uvs {
+		for uvs in lightmap_uvs.values_mut() {
 			for uv in uvs {
 				*uv /= atlas.size().as_vec2();
 			}
@@ -253,7 +253,7 @@ struct DefaultLightmapPacker<LM> {
 impl<LM> DefaultLightmapPacker<LM> {
 	pub fn new(config: TexturePackerConfig) -> Self {
 		Self {
-			packer: TexturePacker::new_skyline(config.clone()),
+			packer: TexturePacker::new_skyline(config),
 			config,
 			images: Vec::new(),
 		}
@@ -418,7 +418,7 @@ impl Lightmaps {
 					.insert(
 						style,
 						image::RgbImage::from_fn(extents.lightmap_size().x, extents.lightmap_size().y, |x, y| {
-							image::Rgb(lighting.get(compute_lighting_index(face, &extents, i, x, y)).unwrap_or_default())
+							image::Rgb(lighting.get(compute_lighting_index(face, extents, i, x, y)).unwrap_or_default())
 						}),
 					)
 					.unwrap();

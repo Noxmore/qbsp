@@ -58,14 +58,14 @@ impl BspParseError {
 		let mut err = self;
 		loop {
 			match err {
-				Self::DoingJob(_, child) => err = &child,
+				Self::DoingJob(_, child) => err = child,
 				_ => return err,
 			}
 		}
 	}
 
 	#[inline]
-	pub fn map_utf8_error<'a>(data: &'a [u8]) -> impl FnOnce(std::str::Utf8Error) -> Self + 'a {
+	pub fn map_utf8_error(data: &[u8]) -> impl FnOnce(std::str::Utf8Error) -> Self + '_ {
 		|err| BspParseError::InvalidString {
 			index: err.valid_up_to(),
 			sequence: data[err.valid_up_to()..err.valid_up_to() + err.error_len().unwrap_or(1)].to_vec(),

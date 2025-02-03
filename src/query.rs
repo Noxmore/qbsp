@@ -127,7 +127,7 @@ impl BspData {
 					fraction: ((real_mid - ctx.start) / (ctx.end - ctx.start)).element_sum() / 3.,
 					position: real_mid,
 					normal: if front_side { -plane.normal } else { plane.normal },
-					node_idx: node_idx,
+					node_idx,
 				};
 
 				// The other side of the node is solid, this is the impact point
