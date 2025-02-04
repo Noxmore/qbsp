@@ -18,7 +18,7 @@ strum = { version = "0.26", features = ["derive"] }
 texture_packer = { version = "0.29", optional = true }
 thiserror = "2.0"
 q1bsp_macros = { path = "q1bsp_macros" }
-derive_more = { version = "1.0.0", features = ["deref", "deref_mut", "into_iterator"] }
+derive_more = { version = "2", features = ["deref", "deref_mut", "into_iterator"] }
 
 [features]
 default = [ "meshing" ]
