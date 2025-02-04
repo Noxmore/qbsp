@@ -46,6 +46,12 @@ impl<'a> BspByteReader<'a> {
 			pos,
 		}
 	}
+
+	/// Returns `true` if `pos` is less than `bytes.len()`.
+	#[inline]
+	pub fn in_bounds(&self) -> bool {
+		self.pos < self.bytes.len()
+	}
 }
 
 /// Defines how a type should be read from a BSP file.
@@ -229,7 +235,7 @@ impl<const N: usize> FromStr for FixedStr<N> {
 			return Err(());
 		}
 		let mut data = [0; N];
-		
+
 		#[allow(clippy::manual_memcpy)]
 		for i in 0..s.len() {
 			data[i] = s.as_bytes()[i];
