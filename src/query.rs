@@ -1,7 +1,5 @@
 use crate::*;
 
-
-
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RaycastResult {
 	pub impact: Option<RaycastImpact>,
@@ -17,7 +15,6 @@ pub struct RaycastImpact {
 
 	/// The index of the node containing the surface that was hit.
 	pub node_idx: u32,
-	
 	// TODO Perhaps we also want to return the face it impacted?
 }
 

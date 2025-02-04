@@ -56,9 +56,7 @@ impl BspData {
 		let mut meshes = Vec::with_capacity(grouped_faces.len());
 
 		for ((texture, tex_flags), faces) in grouped_faces {
-			let mut mesh = ExportedMesh {
-				..Default::default()
-			};
+			let mut mesh = ExportedMesh { ..Default::default() };
 			mesh.texture = texture.to_string();
 			mesh.tex_flags = tex_flags;
 

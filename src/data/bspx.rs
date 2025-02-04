@@ -93,11 +93,11 @@ impl BspxData {
 				Ok(v) => v,
 				Err(err) => return Some(Err(err)),
 			};
-			
+
 			brush_list.push(brushes);
 			i += 1;
 		}
-		
+
 		Some(Ok(brush_list))
 	}
 }

@@ -265,7 +265,7 @@ pub struct ShortBspLeafContents(pub BspLeafContents);
 impl BspValue for ShortBspLeafContents {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let value = reader.read::<i16>()? as i32;
-		
+
 		BspLeafContents::bsp_parse(&mut BspByteReader::new(&value.to_le_bytes(), reader.ctx)).map(Self)
 	}
 
