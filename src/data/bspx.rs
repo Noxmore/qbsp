@@ -81,6 +81,25 @@ impl BspxData {
 		let mut reader = BspByteReader::new(self.get("LIGHTGRID_OCTREE")?, ctx);
 		Some(reader.read().job("Parsing LIGHTGRID_OCTREE BSPX lump"))
 	}
+
+	/// Parses the `BRUSHLIST` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	pub fn parse_brush_list(&self, ctx: &BspParseContext) -> Option<BspResult<BrushList>> {
+		let mut reader = BspByteReader::new(self.get("BRUSHLIST")?, ctx);
+		let mut brush_list = BrushList::new();
+
+		let mut i: usize = 0;
+		while reader.in_bounds() {
+			let brushes = match reader.read().job(format!("Parsing BRUSHLIST BSPX lump element {i}")) {
+				Ok(v) => v,
+				Err(err) => return Some(Err(err)),
+			};
+			
+			brush_list.push(brushes);
+			i += 1;
+		}
+		
+		Some(Ok(brush_list))
+	}
 }
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
@@ -200,4 +219,44 @@ impl BspValue for LightGridCell {
 pub struct LightmapCellSample {
 	pub style: LightmapStyle,
 	pub color: [u8; 3],
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+pub struct ModelBrushesIdx {
+	pub brush_count: u32,
+	/// Total plane count, for validation.
+	pub plane_count: u32,
+}
+impl TryFrom<ModelBrushesIdx> for usize {
+	type Error = ();
+
+	fn try_from(value: ModelBrushesIdx) -> Result<Self, Self::Error> {
+		Ok(value.brush_count as usize)
+	}
+}
+
+/// The output of reading the `BRUSHLIST` BSPX lump.
+pub type BrushList = Vec<ModelBrushes>;
+
+/// Per-model brush information stored in the `BRUSHLIST` BSPX lump.
+#[derive(BspValue, Debug, Clone)]
+pub struct ModelBrushes {
+	/// Should be `1`.
+	pub version: u32,
+	pub model_idx: u32,
+	pub brushes: BspVariableArray<ModelBrush, ModelBrushesIdx>,
+}
+
+#[derive(BspValue, Debug, Clone)]
+pub struct ModelBrush {
+	pub bound: BoundingBox,
+	pub contents: ShortBspLeafContents,
+	/// Non-axial faces only. It's on you to add axial planes via the bounding box.
+	pub planes: BspVariableArray<ModelBrushPlane, u16>,
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+pub struct ModelBrushPlane {
+	pub normal: Vec3,
+	pub dist: f32,
 }
