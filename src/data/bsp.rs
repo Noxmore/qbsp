@@ -259,6 +259,21 @@ pub enum BspLeafContents {
 	CurrentDown = -14,
 }
 
+/// Wrapper for [`BspLeafContents`] that reads an [`i16`] rather than an [`i32`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShortBspLeafContents(pub BspLeafContents);
+impl BspValue for ShortBspLeafContents {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let value = reader.read::<i16>()? as i32;
+		
+		BspLeafContents::bsp_parse(&mut BspByteReader::new(&value.to_le_bytes(), reader.ctx)).map(Self)
+	}
+
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		size_of::<i16>()
+	}
+}
+
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspLeaf {
 	pub contents: BspLeafContents,
