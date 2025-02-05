@@ -2,6 +2,7 @@
 name = "qbsp_macros"
 
 version.workspace = true
+description.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
