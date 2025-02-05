@@ -38,13 +38,7 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 				.iter()
 				.flat_map(|attr| attr.meta.require_list().ok())
 				.filter(|attr| {
-					attr.path.segments
-						== [PathSegment {
-							ident: Ident::new("repr", Span::mixed_site()),
-							arguments: PathArguments::None,
-						}]
-						.into_iter()
-						.collect()
+					compare_path(&attr.path, "repr")
 				})
 				.map(|attr| &attr.tokens)
 				.next()
@@ -82,4 +76,14 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 		}
 	}
 	.into()
+}
+
+fn compare_path(path: &Path, s: &str) -> bool {
+	path.segments
+		== [PathSegment {
+			ident: Ident::new(s, Span::mixed_site()),
+			arguments: PathArguments::None,
+		}]
+		.into_iter()
+		.collect()
 }
