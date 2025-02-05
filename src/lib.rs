@@ -171,7 +171,12 @@ pub struct BspData {
 	pub textures: Vec<Option<BspTexture>>,
 	/// All vertex positions.
 	pub vertices: Vec<Vec3>,
-	// TODO visibility
+	/// RLE encoded bit array.
+	/// 
+	/// See [the specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4) for more info.
+	/// 
+	/// TODO in the future, this crate might support visibility operations
+	pub visibility: Vec<u8>,
 	pub nodes: Vec<BspNode>,
 	pub tex_info: Vec<BspTexInfo>,
 	pub faces: Vec<BspFace>,
@@ -230,6 +235,7 @@ impl BspData {
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
 			textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
+			visibility: lump_dir.vertices.get(bsp)?.to_vec(),
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
