@@ -315,28 +315,40 @@ pub struct BspLeaf {
 pub struct BspTexture {
 	pub header: BspTextureHeader,
 	pub data: Option<Vec<u8>>,
+	pub data_half: Option<Vec<u8>>,
+	pub data_quarter: Option<Vec<u8>>,
+	pub data_eighth: Option<Vec<u8>>,
 }
 impl BspValue for BspTexture {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		// TODO animated textures and the like
 		let start_pos = reader.pos;
 		let header: BspTextureHeader = reader.read()?;
 
-		// From my testing, it seems the data starts at the end of the header, but this is just making sure
-		reader.pos = start_pos + header.offset_full as usize;
-
-		let data = if header.offset_full == 0 {
-			None
-		} else {
-			Some(
-				reader
-					.read_bytes(header.width as usize * header.height as usize)
-					.job(format!("Reading texture with header {header:#?}"))?
-					.to_vec(),
-			)
-		};
-
-		Ok(Self { header, data })
+		macro_rules! read_data {
+			($offset:ident, $res:literal $(, $($res_operator:tt)+)?) => {
+				if header.$offset == 0 {
+					None
+				} else {
+					// From my testing, it seems the data starts at the end of the header, but this is just making sure
+					reader.pos = start_pos + header.$offset as usize;
+					
+					Some(
+						reader
+							.read_bytes((header.width as usize $($($res_operator)+)?) * (header.height as usize $($($res_operator)+)?))
+							.job(format!(concat!("Reading texture (", $res, "res) with header {:#?}"), header))?
+							.to_vec(),
+					)
+				}
+			};
+		}
+		
+		Ok(Self {
+			data: read_data!(offset_full, "full"),
+			data_half: read_data!(offset_half, "half", / 2),
+			data_quarter: read_data!(offset_quarter, "quarter", / 4),
+			data_eighth: read_data!(offset_eighth, "eighth", / 8),
+			header,
+		})
 	}
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		BspTextureHeader::bsp_struct_size(ctx)
