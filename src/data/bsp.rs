@@ -295,7 +295,8 @@ impl BspValue for ShortBspLeafContents {
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspLeaf {
 	pub contents: BspLeafContents,
-	pub vis_list: u32,
+	/// Beginning of visibility lists, or `-1`.
+	pub vis_list: i32,
 
 	pub bound: VariableBoundingBox,
 
