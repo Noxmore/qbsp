@@ -4,11 +4,23 @@ members = [ "qbsp_macros" ]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Noxmore"]
+repository = "https://github.com/Noxmore/qbsp"
+license = "MIT OR Apache-2.0"
+
 
 [package]
 name = "qbsp"
+description = "Rust crate for parsing and operating with Quake 1 BSP files"
+readme = "readme.md"
+categories = ["game-development"]
+
 version.workspace = true
 edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
 
 [dependencies]
 glam = "0.29"
