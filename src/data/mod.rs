@@ -3,7 +3,7 @@
 pub mod bsp;
 pub mod bspx;
 
-use std::{marker::PhantomData, ops::{Deref, DerefMut}, str::FromStr};
+use std::{io::Write, marker::PhantomData, ops::{Deref, DerefMut}, str::FromStr};
 
 use crate::*;
 
@@ -54,9 +54,15 @@ impl<'a> BspByteReader<'a> {
 	}
 }
 
+pub struct BspWriter<'a> {
+	pub ctx: &'a BspParseContext,
+	pub buf: &'a mut dyn Write,
+}
+
 /// Defines how a type should be read from a BSP file.
 pub trait BspValue: Sized {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()>;
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
 macro_rules! impl_bsp_parse_primitive {
@@ -65,6 +71,10 @@ macro_rules! impl_bsp_parse_primitive {
 			#[inline]
 			fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 				Ok(<$ty>::from_le_bytes(reader.read_bytes(size_of::<$ty>())?.try_into().unwrap()))
+			}
+			#[inline]
+			fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+				writer.buf.write_all(&self.to_le_bytes())
 			}
 			#[inline]
 			fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
@@ -78,6 +88,9 @@ macro_rules! impl_bsp_parse_vector {
 		impl BspValue for $ty {
 			fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 				Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
+			}
+			fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+				self.to_array().bsp_write(writer)
 			}
 			fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 				size_of::<$element>() * $count
@@ -98,6 +111,10 @@ impl BspValue for u8 {
 	#[inline]
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		reader.read_bytes(1).map(|bytes| bytes[0])
+	}
+	#[inline]
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+		writer.buf.write_all(&[*self])
 	}
 	#[inline]
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
@@ -121,6 +138,12 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 		}
 		Ok(out.map(|v| unsafe { v.assume_init() }))
 	}
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+		for value in self {
+			value.bsp_write(writer)?;
+		}
+		Ok(())
+	}
 	#[inline]
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		T::bsp_struct_size(ctx) * N
@@ -135,13 +158,17 @@ impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
 		Self(value, PhantomData)
 	}
 }
-impl<BSP2: BspValue, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue<BSP2, BSP29> {
+impl<BSP2: BspValue + TryInto<BSP29>, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue<BSP2, BSP29> {
 	#[inline]
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
 			BspFormat::BSP2 => reader.read().map(Self::new),
 			BspFormat::BSP29 => Ok(Self::new(BSP29::bsp_parse(reader)?.into())),
 		}
+	}
+	#[inline]
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+		self.0.bsp_write(writer)
 	}
 	#[inline]
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
@@ -187,7 +214,7 @@ pub struct BspVariableArray<T, N> {
 	pub inner: Vec<T>,
 	_marker: PhantomData<N>,
 }
-impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue for BspVariableArray<T, N> {
+impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug> + TryFrom<usize, Error: std::fmt::Debug>> BspValue for BspVariableArray<T, N> {
 	#[track_caller] // Just in case this unwrap fails, almost certainly not needed.
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let count: usize = reader.read::<N>().job("count")?.try_into().unwrap();
@@ -198,6 +225,16 @@ impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue
 		}
 
 		Ok(Self { inner, _marker: PhantomData })
+	}
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+		let len: N = self.inner.len().try_into().unwrap();
+
+		len.bsp_write(writer)?;
+		for value in &self.inner {
+			value.bsp_write(writer)?;
+		}
+		
+		Ok(())
 	}
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 		unimplemented!("{} is of variable size", std::any::type_name::<Self>());
@@ -213,6 +250,9 @@ impl<const N: usize> BspValue for FixedStr<N> {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let data = reader.read()?;
 		Self::new(data).map_err(BspParseError::map_utf8_error(&data))
+	}
+	fn bsp_write(&self, writer: &mut BspWriter) -> io::Result<()> {
+		self.data.bsp_write(writer)
 	}
 	#[inline]
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {

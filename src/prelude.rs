@@ -3,6 +3,7 @@ pub(crate) use glam::*;
 pub(crate) use smallvec::*;
 pub(crate) use std::collections::HashMap;
 pub(crate) use std::mem;
+pub(crate) use std::io;
 pub(crate) use thiserror::Error;
 
 pub(crate) use crate::util::*;
