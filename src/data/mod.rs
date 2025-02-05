@@ -144,8 +144,8 @@ impl<BSP2: BspValue, BSP29: BspValue> BspValue for BspVariableValue<BSP2, BSP29>
 	#[inline]
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		match ctx.format {
-			BspFormat::BSP2 => mem::size_of::<BSP2>(),
-			BspFormat::BSP29 => mem::size_of::<BSP29>(),
+			BspFormat::BSP2 => BSP2::bsp_struct_size(ctx),
+			BspFormat::BSP29 => BSP29::bsp_struct_size(ctx),
 		}
 	}
 }
