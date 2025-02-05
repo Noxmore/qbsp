@@ -44,7 +44,7 @@ impl BspData {
 
 		for i in model.first_face..model.first_face + model.num_faces {
 			let face = &self.faces[i as usize];
-			let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
+			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 			let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
 
 			grouped_faces
@@ -63,20 +63,20 @@ impl BspData {
 			for (face_idx, face) in faces {
 				mesh.faces.push(face_idx);
 
-				let plane = &self.planes[face.plane_idx.bsp2() as usize];
-				let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
+				let plane = &self.planes[face.plane_idx.0 as usize];
+				let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 				let texture_size = self.textures[tex_info.texture_idx as usize]
 					.as_ref()
 					.map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
 					.unwrap_or(Vec2::ONE);
 
 				// The uv coordinates of the face's lightmap in the world, rather than on a lightmap atlas
-				let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.bsp2() as usize);
+				let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.0 as usize);
 
 				let first_index = mesh.positions.len() as u32;
 				for pos in face.vertices(self) {
 					mesh.positions.push(pos);
-					mesh.normals.push(if face.plane_side.bsp2() == 0 { plane.normal } else { -plane.normal });
+					mesh.normals.push(if face.plane_side.0 == 0 { plane.normal } else { -plane.normal });
 
 					let uv = world_uv(pos, tex_info);
 
@@ -86,14 +86,14 @@ impl BspData {
 				}
 
 				// Calculate indices
-				for i in 1..face.num_edges.bsp2() - 1 {
+				for i in 1..face.num_edges.0 - 1 {
 					mesh.indices.push([0, i + 1, i].map(|x| first_index + x));
 				}
 
 				// Insert lightmap uvs
 				if let Some(uv_map) = lightmap_uvs {
 					if let Some(uvs) = uv_map.get(&face_idx) {
-						assert_eq!(uvs.len(), face.num_edges.bsp2() as usize);
+						assert_eq!(uvs.len(), face.num_edges.0 as usize);
 						mesh.lightmap_uvs.get_or_insert_with(Vec::new).extend(uvs);
 					}
 				}

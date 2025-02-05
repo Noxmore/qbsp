@@ -75,12 +75,12 @@ impl BspFace {
 	/// Returns an iterator that retrieves the vertex positions that make up this face from `bsp`.
 	#[inline]
 	pub fn vertices<'a>(&self, bsp: &'a BspData) -> impl Iterator<Item = Vec3> + 'a {
-		(self.first_edge..self.first_edge + self.num_edges.bsp2()).map(|i| {
+		(self.first_edge..self.first_edge + self.num_edges.0).map(|i| {
 			let surf_edge = bsp.surface_edges[i as usize];
 			let edge = bsp.edges[surf_edge.unsigned_abs() as usize];
 			let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
 
-			bsp.vertices[vert_idx.0.bsp2() as usize]
+			bsp.vertices[vert_idx.0.0 as usize]
 		})
 	}
 }
@@ -232,7 +232,7 @@ impl BspValue for VariableBspNodeRef {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let value = IBspValue::bsp_parse(reader)?;
 
-		Ok(Self(BspNodeRef::from_i32(value.bsp2())))
+		Ok(Self(BspNodeRef::from_i32(value.0)))
 	}
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		IBspValue::bsp_struct_size(ctx)

@@ -3,7 +3,7 @@
 pub mod bsp;
 pub mod bspx;
 
-use std::{marker::PhantomData, str::FromStr};
+use std::{marker::PhantomData, ops::{Deref, DerefMut}, str::FromStr};
 
 use crate::*;
 
@@ -128,17 +128,19 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 }
 
 /// A value in a BSP file where its size differs between formats.
-#[derive(Debug, Clone, Copy)]
-pub enum BspVariableValue<BSP2, BSP29> {
-	BSP2(BSP2),
-	BSP29(BSP29),
+#[derive(Clone, Copy)]
+pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, PhantomData<BSP29>);
+impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
+	pub fn new(value: BSP2) -> Self {
+		Self(value, PhantomData)
+	}
 }
-impl<BSP2: BspValue, BSP29: BspValue> BspValue for BspVariableValue<BSP2, BSP29> {
+impl<BSP2: BspValue, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue<BSP2, BSP29> {
 	#[inline]
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
-			BspFormat::BSP2 => Ok(Self::BSP2(reader.read()?)),
-			BspFormat::BSP29 => Ok(Self::BSP29(reader.read()?)),
+			BspFormat::BSP2 => reader.read().map(Self::new),
+			BspFormat::BSP29 => Ok(Self::new(BSP29::bsp_parse(reader)?.into())),
 		}
 	}
 	#[inline]
@@ -149,14 +151,25 @@ impl<BSP2: BspValue, BSP29: BspValue> BspValue for BspVariableValue<BSP2, BSP29>
 		}
 	}
 }
-impl<BSP2, BSP29: Into<BSP2>> BspVariableValue<BSP2, BSP29> {
-	/// Converts the value stored within into the value expected by the BSP2 format. This is the function you want to get the value out of this.
-	#[inline]
-	pub fn bsp2(self) -> BSP2 {
-		match self {
-			Self::BSP2(v) => v,
-			Self::BSP29(v) => v.into(),
-		}
+impl<BSP2, BSP29> Deref for BspVariableValue<BSP2, BSP29> {
+	type Target = BSP2;
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+impl<BSP2, BSP29> DerefMut for BspVariableValue<BSP2, BSP29> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
+	}
+}
+impl<BSP2: std::fmt::Debug, BSP29: std::fmt::Debug> std::fmt::Debug for BspVariableValue<BSP2, BSP29> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
+}
+impl<BSP2: std::fmt::Display, BSP29: std::fmt::Display> std::fmt::Display for BspVariableValue<BSP2, BSP29> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
 	}
 }
 

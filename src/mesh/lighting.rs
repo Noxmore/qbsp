@@ -60,7 +60,7 @@ impl ReservedLightmapPixel {
 			}
 		};
 
-		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); face.num_edges.bsp2() as usize])
+		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); face.num_edges.0 as usize])
 	}
 }
 
@@ -94,7 +94,7 @@ impl BspData {
 
 				for (face_idx, face) in self.faces.iter().enumerate() {
 					if face.lightmap_offset.is_negative() {
-						let tex_info = self.tex_info[face.texture_info_idx.bsp2() as usize];
+						let tex_info = self.tex_info[face.texture_info_idx.0 as usize];
 
 						lightmap_uvs.insert(
 							face_idx as u32,
@@ -111,7 +111,7 @@ impl BspData {
 						continue;
 					}
 
-					let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
+					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
 					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| world_uv(pos, tex_info)).collect();
 					let extents = FaceExtents::new(uvs.iter().copied());
@@ -131,7 +131,7 @@ impl BspData {
 
 				for (face_idx, face) in self.faces.iter().enumerate() {
 					if face.lightmap_offset.is_negative() {
-						let tex_info = self.tex_info[face.texture_info_idx.bsp2() as usize];
+						let tex_info = self.tex_info[face.texture_info_idx.0 as usize];
 
 						lightmap_uvs.insert(
 							face_idx as u32,
@@ -158,7 +158,7 @@ impl BspData {
 						continue;
 					}
 
-					let tex_info = &self.tex_info[face.texture_info_idx.bsp2() as usize];
+					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
 					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| world_uv(pos, tex_info)).collect();
 					let extents = FaceExtents::new(uvs.iter().copied());
