@@ -1,10 +1,25 @@
 # Q1BSP
 
-Work in progress Rust crate for parsing Id Tech 1 BSP files.
+Rust crate for parsing, and operating with Quake 1 BSP files.
 
-Currently supports the BSP29 and BSP2 formats.
+## Features
+- Parsing `.bsp` files with the BSP29 and BSP2 formats.
+- Structured easy access to the bsp data.
+- BSP raycasting.
+- Mesh generation.
+- Lightmap atlas generation either per-style or per-slot (`.lit` supported).
+- BSPX support, including built-in structures for the `RGBLIGHTING`, `LIGHTGRID_OCTREE`, and `BRUSHLIST` lumps.
 
-# TODO before first release
+## How to use
+```rust
+use q1bsp::prelude::*;
+
+BspData::parse(BspParseInput {
+    bsp: &[], // Data of the bsp file.
+    lit: None, // Optional lit file for colored lighting if no `RGBLIGHTING` BSPX lump is present.
+});
+```
+
+# Future plans
 - More flexible meshing API
-- Unit testing
 - BSP writing
