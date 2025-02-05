@@ -239,6 +239,24 @@ impl BspValue for VariableBspNodeRef {
 	}
 }
 
+/// According to the [`gamers.org` specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL9):
+/// 
+/// > This structure is used to give a rough and somewhat exaggerated boundary to a given model. It does not separate models from each others, and is not used at all in the rendering of the levels
+///
+/// > Actually, the clip nodes are only used as a first and primitive collision checking method.
+/// 
+/// I think it is also used for shape casting.
+#[derive(BspValue, Debug, Clone, Copy)]
+pub struct BspClipNode {
+	/// Index of the [BspPlane] that splits the clip node.
+	pub plane_idx: u32,
+
+	/// If positive, id of Front child node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
+	pub front: IBspValue,
+	/// If positive, id of Back child node. If -2, the Back part is inside the model. If -1, the Back part is outside the model.
+	pub back: IBspValue,
+}
+
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[repr(i32)]
 pub enum BspLeafContents {

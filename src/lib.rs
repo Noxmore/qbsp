@@ -176,9 +176,8 @@ pub struct BspData {
 	pub tex_info: Vec<BspTexInfo>,
 	pub faces: Vec<BspFace>,
 	pub lighting: Option<BspLighting>,
-	// TODO clip_nodes
+	pub clip_nodes: Vec<BspClipNode>,
 	pub leaves: Vec<BspLeaf>,
-	// TODO mark_surfaces
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
 	pub models: Vec<BspModel>,
@@ -245,6 +244,7 @@ impl BspData {
 					Some(BspLighting::White(lighting.to_vec()))
 				}
 			},
+			clip_nodes: read_lump(bsp, lump_dir.clip_nodes, "clip nodes", &ctx)?,
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
