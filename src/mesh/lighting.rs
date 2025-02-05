@@ -512,7 +512,7 @@ pub enum LightmapAtlasData {
 	/// NOTE: Not all the images are guaranteed to be the same size, if a slot is never used the image will be 1x1 to save on memory.
 	PerSlot {
 		slots: [image::RgbImage; 4],
-		styles: image::RgbaImage, // TODO is there a better way of doing this than an image?
+		styles: image::RgbaImage,
 	},
 }
 
