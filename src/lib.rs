@@ -15,7 +15,7 @@ pub mod util;
 // Re-exports
 pub use glam;
 pub use image;
-pub use q1bsp_macros::*;
+pub use qbsp_macros::*;
 pub use smallvec;
 
 /// The default quake palette.

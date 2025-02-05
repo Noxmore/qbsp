@@ -1,4 +1,4 @@
-# Q1BSP
+# QBSP
 
 Rust crate for parsing, and operating with Quake 1 BSP files.
 
@@ -12,7 +12,7 @@ Rust crate for parsing, and operating with Quake 1 BSP files.
 
 ## How to use
 ```rust
-use q1bsp::prelude::*;
+use qbsp::prelude::*;
 
 BspData::parse(BspParseInput {
     bsp: &[], // Data of the bsp file.

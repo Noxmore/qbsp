@@ -1,12 +1,12 @@
 [workspace]
-members = [ "q1bsp_macros" ]
+members = [ "qbsp_macros" ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 
 [package]
-name = "q1bsp"
+name = "qbsp"
 version.workspace = true
 edition.workspace = true
 
@@ -17,7 +17,7 @@ smallvec = "1"
 strum = { version = "0.26", features = ["derive"] }
 texture_packer = { version = "0.29", optional = true }
 thiserror = "2.0"
-q1bsp_macros = { path = "q1bsp_macros" }
+qbsp_macros = { path = "qbsp_macros" }
 derive_more = { version = "2", features = ["deref", "deref_mut", "into_iterator"] }
 
 [features]
