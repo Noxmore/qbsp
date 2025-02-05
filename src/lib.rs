@@ -178,6 +178,8 @@ pub struct BspData {
 	pub lighting: Option<BspLighting>,
 	pub clip_nodes: Vec<BspClipNode>,
 	pub leaves: Vec<BspLeaf>,
+	/// Indices into the face list, pointed to by leaves.
+	pub mark_surfaces: Vec<UBspValue>,
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
 	pub models: Vec<BspModel>,
@@ -246,6 +248,7 @@ impl BspData {
 			},
 			clip_nodes: read_lump(bsp, lump_dir.clip_nodes, "clip nodes", &ctx)?,
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
+			mark_surfaces: read_lump(bsp, lump_dir.mark_surfaces, "mark surfaces", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
 			models: read_lump(bsp, lump_dir.models, "models", &ctx)?,

@@ -299,7 +299,9 @@ pub struct BspLeaf {
 
 	pub bound: VariableBoundingBox,
 
+	/// Index in the `mark_surfaces` list.
 	pub face_idx: UBspValue,
+	/// Number of elements in the `mark_surfaces` list.
 	pub face_num: UBspValue,
 
 	pub ambience_water: u8,
