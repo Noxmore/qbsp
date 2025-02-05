@@ -174,9 +174,9 @@ pub struct BspData {
 	/// All vertex positions.
 	pub vertices: Vec<Vec3>,
 	/// RLE encoded bit array.
-	/// 
+	///
 	/// See [the specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4) for more info.
-	/// 
+	///
 	/// TODO in the future, this crate might support visibility operations
 	pub visibility: Vec<u8>,
 	pub nodes: Vec<BspNode>,

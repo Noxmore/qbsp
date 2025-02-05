@@ -80,7 +80,7 @@ impl BspFace {
 			let edge = bsp.edges[surf_edge.unsigned_abs() as usize];
 			let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
 
-			bsp.vertices[vert_idx.0.0 as usize]
+			bsp.vertices[*vert_idx.0 as usize]
 		})
 	}
 }
@@ -240,11 +240,11 @@ impl BspValue for VariableBspNodeRef {
 }
 
 /// According to the [`gamers.org` specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL9):
-/// 
+///
 /// > This structure is used to give a rough and somewhat exaggerated boundary to a given model. It does not separate models from each others, and is not used at all in the rendering of the levels
 ///
 /// > Actually, the clip nodes are only used as a first and primitive collision checking method.
-/// 
+///
 /// I think it is also used for shape casting.
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspClipNode {
@@ -331,7 +331,7 @@ impl BspValue for BspTexture {
 				} else {
 					// From my testing, it seems the data starts at the end of the header, but this is just making sure
 					reader.pos = start_pos + header.$offset as usize;
-					
+
 					Some(
 						reader
 							.read_bytes((header.width as usize $($($res_operator)+)?) * (header.height as usize $($($res_operator)+)?))
@@ -341,7 +341,7 @@ impl BspValue for BspTexture {
 				}
 			};
 		}
-		
+
 		Ok(Self {
 			data: read_data!(offset_full, "full"),
 			data_half: read_data!(offset_half, "half", / 2),

@@ -510,10 +510,7 @@ pub enum LightmapAtlasData {
 	/// This is less simple than [PerStyle](LightmapAtlasType::PerStyle), but usually uses much less memory and computation at runtime.
 	///
 	/// NOTE: Not all the images are guaranteed to be the same size, if a slot is never used the image will be 1x1 to save on memory.
-	PerSlot {
-		slots: [image::RgbImage; 4],
-		styles: image::RgbaImage,
-	},
+	PerSlot { slots: [image::RgbImage; 4], styles: image::RgbaImage },
 }
 
 impl LightmapAtlasData {

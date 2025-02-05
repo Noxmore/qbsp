@@ -3,7 +3,11 @@
 pub mod bsp;
 pub mod bspx;
 
-use std::{marker::PhantomData, ops::{Deref, DerefMut}, str::FromStr};
+use std::{
+	marker::PhantomData,
+	ops::{Deref, DerefMut},
+	str::FromStr,
+};
 
 use crate::*;
 

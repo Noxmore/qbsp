@@ -37,9 +37,7 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 				.attrs
 				.iter()
 				.flat_map(|attr| attr.meta.require_list().ok())
-				.filter(|attr| {
-					compare_path(&attr.path, "repr")
-				})
+				.filter(|attr| compare_path(&attr.path, "repr"))
 				.map(|attr| &attr.tokens)
 				.next()
 				.expect("#[repr(...)] required");
