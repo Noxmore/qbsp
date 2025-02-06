@@ -11,7 +11,7 @@ use std::{
 
 use crate::*;
 
-/// Like an [io::Cursor], but i don't have to constantly juggle buffers.
+/// Like a [`Cursor`](std::io::Cursor), but i don't have to constantly juggle buffers.
 pub struct BspByteReader<'a> {
 	pub ctx: &'a BspParseContext,
 	bytes: &'a [u8],

@@ -24,7 +24,7 @@ impl BspData {
 		self.leaf_at_point_in_node(self.models[model_idx].head_bsp_node, point)
 	}
 
-	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [Self::leaf_at_point].
+	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [`Self::leaf_at_point`].
 	pub fn leaf_at_point_in_node(&self, mut node_ref: BspNodeRef, point: Vec3) -> usize {
 		loop {
 			match node_ref {

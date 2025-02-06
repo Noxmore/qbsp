@@ -500,14 +500,14 @@ pub type LightmapUvMap = HashMap<u32, SmallVec<[Vec2; 5]>>;
 #[derive(strum::EnumDiscriminants)]
 #[strum_discriminants(name(LightmapAtlasType))]
 pub enum LightmapAtlasData {
-	/// One image is generated for each [LightmapStyle] with lights using it, which then can be simply summed to generate the final lightmap.
+	/// One image is generated for each [`LightmapStyle`] with lights using it, which then can be simply summed to generate the final lightmap.
 	PerStyle(Lightmaps),
 
 	/// Without using the `LMSTYLE16` BSPX lump, each face can only have up to 4 lightmap styles specified. This technique takes advantage of that fact, having an atlas for each slot for all faces rather than each style.
 	///
-	/// It then uses an RGBA image, with each color channel's byte being a [LightmapStyle].
+	/// It then uses an RGBA image, with each color channel's byte being a [`LightmapStyle`].
 	///
-	/// This is less simple than [PerStyle](LightmapAtlasType::PerStyle), but usually uses much less memory and computation at runtime.
+	/// This is less simple than [`PerStyle`](LightmapAtlasType::PerStyle), but usually uses much less memory and computation at runtime.
 	///
 	/// NOTE: Not all the images are guaranteed to be the same size, if a slot is never used the image will be 1x1 to save on memory.
 	PerSlot { slots: [image::RgbImage; 4], styles: image::RgbaImage },

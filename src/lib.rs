@@ -55,7 +55,7 @@ pub enum BspParseError {
 	DoingJob(String, Box<BspParseError>),
 }
 impl BspParseError {
-	/// The error error behind any [BspParseError::DoingJob].
+	/// The error error behind any [`BspParseError::DoingJob`].
 	pub fn root(&self) -> &BspParseError {
 		let mut err = self;
 		loop {
@@ -269,7 +269,7 @@ impl BspData {
 		Ok(data)
 	}
 
-	/// Parses embedded textures using the provided palette. Use [QUAKE_PALETTE] for the default Quake palette.
+	/// Parses embedded textures using the provided palette. Use [`QUAKE_PALETTE`] for the default Quake palette.
 	pub fn parse_embedded_textures<'a, 'p: 'a>(&'a self, palette: &'p Palette) -> impl Iterator<Item = (&'a str, image::RgbImage)> + 'a {
 		self.textures.iter().flatten().filter(|texture| texture.data.is_some()).map(|texture| {
 			let Some(data) = &texture.data else { unreachable!() };

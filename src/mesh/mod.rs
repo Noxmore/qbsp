@@ -1,4 +1,4 @@
-//! Turning [BspData] into a renderable mesh.
+//! Turning [`BspData`] into a renderable mesh.
 
 pub mod lighting;
 
@@ -26,7 +26,7 @@ pub struct ExportedMesh {
 	pub texture: String,
 }
 
-/// The output of [BspData::mesh_model]. Contains one mesh for each texture used in the model.
+/// The output of [`BspData::mesh_model`]. Contains one mesh for each texture used in the model.
 pub struct MeshModelOutput {
 	pub meshes: Vec<ExportedMesh>,
 }
@@ -118,7 +118,7 @@ pub fn world_uv(pos: Vec3, tex_info: &BspTexInfo) -> Vec2 {
 	.as_vec2()
 }
 
-/// Computes the index into [BspLighting] for the specific face specified.
+/// Computes the index into [`BspLighting`] for the specific face specified.
 #[inline]
 pub fn compute_lighting_index(face: &BspFace, extents: &FaceExtents, light_style_idx: usize, x: u32, y: u32) -> usize {
 	face.lightmap_offset as usize + (extents.lightmap_pixels() as usize * light_style_idx) + (y * extents.lightmap_size().x + x) as usize
@@ -182,7 +182,7 @@ impl FaceExtents {
 		self.lightmap_pixels
 	}
 
-	/// Computes texture-space lightmap UVs, provide the same set of face UVs supplied to [FaceExtents::new], and the position of the lightmap on the atlas.
+	/// Computes texture-space lightmap UVs, provide the same set of face UVs supplied to [`FaceExtents::new`], and the position of the lightmap on the atlas.
 	pub fn compute_lightmap_uvs<'a>(&'a self, uvs: impl IntoIterator<Item = Vec2> + 'a, lightmap_position: Vec2) -> impl Iterator<Item = Vec2> + 'a {
 		uvs.into_iter().map(move |mut uv| {
 			// Move from world space into top left corner

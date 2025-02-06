@@ -49,7 +49,7 @@ impl BspValue for BspxDirectory {
 	}
 }
 
-/// Owned version of [BspxDirectory]. Convert via [BspxData::new].
+/// Owned version of [`BspxDirectory`]. Convert via [`BspxData::new`].
 #[derive(Debug, Clone, Default)]
 pub struct BspxData {
 	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Box<[u8]>>,

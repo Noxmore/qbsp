@@ -62,7 +62,7 @@ pub struct BspFace {
 
 	/// Each face can have up to 4 lightmaps, the additional 3 are positioned right after the lightmap at `lightmap_offset`.
 	///
-	/// Each element in this array is the style in which these lightmaps appear, see docs for [LightmapStyle].
+	/// Each element in this array is the style in which these lightmaps appear, see docs for [`LightmapStyle`].
 	///
 	/// You can also short-circuit when looping through these styles, if `lightmap_styles[2]` is 255, there isn't a possibility that `lightmap_styles[3]` isn't.
 	pub lightmap_styles: [LightmapStyle; 4],
@@ -187,7 +187,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
 
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspNode {
-	/// Index of the [BspPlane] that splits the node.
+	/// Index of the [`BspPlane`] that splits the node.
 	pub plane_idx: u32,
 
 	pub front: VariableBspNodeRef,
@@ -195,13 +195,13 @@ pub struct BspNode {
 
 	/// Bounding box of the node and all its children.
 	pub bound: VariableBoundingBox,
-	/// Index of the first [BspFace] the node contains.
+	/// Index of the first [`BspFace`] the node contains.
 	pub face_idx: UBspValue,
 	/// Number of faces this node contains.
 	pub face_num: UBspValue,
 }
 
-/// A reference to a [BspNode]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
+/// A reference to a [`BspNode`]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BspNodeRef {
 	Node(u32),
@@ -225,7 +225,7 @@ impl BspValue for BspNodeRef {
 	}
 }
 
-/// Wrapper over [BspNodeRef] that reads a [IBspValue] instead of an `i32`.
+/// Wrapper over [`BspNodeRef`] that reads a [`IBspValue`] instead of an `i32`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VariableBspNodeRef(pub BspNodeRef);
 impl BspValue for VariableBspNodeRef {
@@ -248,7 +248,7 @@ impl BspValue for VariableBspNodeRef {
 /// I think it is also used for shape casting.
 #[derive(BspValue, Debug, Clone, Copy)]
 pub struct BspClipNode {
-	/// Index of the [BspPlane] that splits the clip node.
+	/// Index of the [`BspPlane`] that splits the clip node.
 	pub plane_idx: u32,
 
 	/// If positive, id of Front child node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
