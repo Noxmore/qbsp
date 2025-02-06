@@ -2,7 +2,7 @@
 members = [ "qbsp_macros" ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 description = "Rust crate for parsing and operating with Quake 1 BSP files"
 edition = "2021"
 authors = ["Noxmore"]
@@ -30,7 +30,7 @@ smallvec = "1"
 strum = { version = "0.26", features = ["derive"] }
 texture_packer = { version = "0.29", optional = true }
 thiserror = "2.0"
-qbsp_macros = { version = "0.1.0", path = "qbsp_macros" }
+qbsp_macros = { version = "0.2.0", path = "qbsp_macros" }
 derive_more = { version = "2", features = ["deref", "deref_mut", "into_iterator"] }
 bevy_reflect = { version = "*", features = ["glam"], optional = true }
 
