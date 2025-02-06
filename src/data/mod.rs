@@ -133,7 +133,8 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 
 /// A value in a BSP file where its size differs between formats.
 #[derive(Clone, Copy)]
-pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, PhantomData<BSP29>);
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, #[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<BSP29>);
 impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
 	pub fn new(value: BSP2) -> Self {
 		Self(value, PhantomData)
@@ -184,6 +185,7 @@ pub type IBspValue = BspVariableValue<i32, i16>;
 
 /// A variable length array in the format of `N` (count) then `[T; N]` (elements).
 #[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspVariableArray<T, N> {
 	#[deref]
 	#[deref_mut]
@@ -210,6 +212,7 @@ impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue
 
 /// Fixed-sized UTF-8 string. Zero-padded.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct FixedStr<const N: usize> {
 	data: [u8; N],
 }
@@ -263,20 +266,23 @@ impl<const N: usize> FromStr for FixedStr<N> {
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BoundingBox {
 	pub min: Vec3,
 	pub max: Vec3,
 }
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct ShortBoundingBox {
-	pub min: U16Vec3,
-	pub max: U16Vec3,
+	// TODO tmp fix until bevy_reflect 0.16, where i can make them U16Vec3 again
+	pub min: [u16; 3],
+	pub max: [u16; 3],
 }
 impl From<ShortBoundingBox> for BoundingBox {
 	fn from(value: ShortBoundingBox) -> Self {
 		Self {
-			min: value.min.as_vec3(),
-			max: value.max.as_vec3(),
+			min: Vec3::from_array(value.min.map(|x| x as f32)),
+			max: Vec3::from_array(value.max.map(|x| x as f32)),
 		}
 	}
 }
@@ -286,6 +292,7 @@ pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct LumpEntry {
 	pub offset: u32,
 	pub len: u32,
@@ -305,6 +312,7 @@ impl LumpEntry {
 
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct LumpDirectory {
 	pub entities: LumpEntry,
 	pub planes: LumpEntry,

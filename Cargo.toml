@@ -32,7 +32,9 @@ texture_packer = { version = "0.29", optional = true }
 thiserror = "2.0"
 qbsp_macros = { version = "0.1.0", path = "qbsp_macros" }
 derive_more = { version = "2", features = ["deref", "deref_mut", "into_iterator"] }
+bevy_reflect = { version = "*", features = ["glam"], optional = true }
 
 [features]
 default = [ "meshing" ]
 meshing = [ "dep:texture_packer" ]
+bevy_reflect = [ "dep:bevy_reflect" ]

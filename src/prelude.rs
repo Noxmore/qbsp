@@ -1,5 +1,6 @@
+#[cfg(feature = "bevy_reflect")]
+pub(crate) use bevy_reflect::prelude::*;
 pub(crate) use glam::*;
-#[cfg(feature = "meshing")]
 pub(crate) use smallvec::*;
 pub(crate) use std::collections::HashMap;
 pub(crate) use std::mem;

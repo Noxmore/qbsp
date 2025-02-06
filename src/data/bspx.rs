@@ -6,12 +6,14 @@ use crate::*;
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspxLumpEntry {
 	pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
 	pub entry: LumpEntry,
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspxDirectory {
 	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
 }
@@ -51,8 +53,9 @@ impl BspValue for BspxDirectory {
 
 /// Owned version of [`BspxDirectory`]. Convert via [`BspxData::new`].
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspxData {
-	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Box<[u8]>>,
+	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Vec<u8>>,
 }
 impl BspxData {
 	pub fn new(bsp: &[u8], dir: &BspxDirectory) -> BspResult<Self> {

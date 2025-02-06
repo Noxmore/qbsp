@@ -92,6 +92,7 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub enum BspFormat {
 	/// Modern BSP format with expanded limits
 	#[default]
@@ -113,6 +114,7 @@ impl BspFormat {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspParseContext {
 	pub format: BspFormat,
 }
@@ -148,7 +150,6 @@ impl Palette {
 
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
 pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
-	// let entry = lump_dir.get(lump);
 	let lump_data = entry.get(data)?;
 	let lump_entries = entry.len as usize / T::bsp_struct_size(ctx);
 
@@ -164,6 +165,7 @@ pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static
 
 /// A BSP files contents parsed into structures for easy access.
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 pub struct BspData {
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.
