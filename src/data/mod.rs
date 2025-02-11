@@ -134,6 +134,7 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 /// A value in a BSP file where its size differs between formats.
 #[derive(Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, #[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<BSP29>);
 impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
 	pub fn new(value: BSP2) -> Self {
@@ -186,6 +187,7 @@ pub type IBspValue = BspVariableValue<i32, i16>;
 /// A variable length array in the format of `N` (count) then `[T; N]` (elements).
 #[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspVariableArray<T, N> {
 	#[deref]
 	#[deref_mut]
@@ -264,15 +266,46 @@ impl<const N: usize> FromStr for FixedStr<N> {
 		Ok(Self { data })
 	}
 }
+#[cfg(feature = "serde")]
+impl<const N: usize> Serialize for FixedStr<N> {
+	fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+		serializer.serialize_str(self.as_str())
+	}
+}
+#[cfg(feature = "serde")]
+impl<'de, const N: usize> Deserialize<'de> for FixedStr<N> {
+	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+		struct DataVisitor<const N: usize>;
+		impl<const N: usize> de::Visitor<'_> for DataVisitor<N> {
+			type Value = [u8; N];
+			fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+				write!(fmt, "Fixed string of len {N}")
+			}
+
+			fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
+				v.as_bytes()
+					.try_into()
+					.map_err(|_| E::custom(format_args!("string was of len {}, when max len is {N}", v.len())))
+			}
+		}
+
+		// `visit_str` ensures the string is valid
+		Ok(Self {
+			data: deserializer.deserialize_seq(DataVisitor::<N>)?,
+		})
+	}
+}
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BoundingBox {
 	pub min: Vec3,
 	pub max: Vec3,
 }
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ShortBoundingBox {
 	// TODO tmp fix until bevy_reflect 0.16, where i can make them U16Vec3 again
 	pub min: [u16; 3],
@@ -293,6 +326,7 @@ pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LumpEntry {
 	pub offset: u32,
 	pub len: u32,
@@ -313,6 +347,7 @@ impl LumpEntry {
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LumpDirectory {
 	pub entities: LumpEntry,
 	pub planes: LumpEntry,

@@ -6,6 +6,7 @@ use crate::*;
 
 /// A mesh exported from a BSP file for rendering.
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ExportedMesh {
 	/// Positions of vertices in this mesh. NOTE: These are in Z-up coordinate space.
 	pub positions: Vec<Vec3>,
@@ -126,6 +127,7 @@ pub fn compute_lighting_index(face: &BspFace, extents: &FaceExtents, light_style
 
 /// Computed extents of a face for various calculations, mainly involving lightmaps.
 #[derive(Debug, Clone, Copy, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FaceExtents {
 	face_rect: Rect<Vec2>,
 

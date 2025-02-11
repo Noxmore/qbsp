@@ -93,6 +93,7 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum BspFormat {
 	/// Modern BSP format with expanded limits
 	#[default]
@@ -115,6 +116,7 @@ impl BspFormat {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspParseContext {
 	pub format: BspFormat,
 }
@@ -166,6 +168,7 @@ pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static
 /// A BSP files contents parsed into structures for easy access.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspData {
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.

@@ -5,6 +5,7 @@ use crate::*;
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspEdge {
 	/// The index to the first vertex this edge connects
 	pub a: UBspValue,
@@ -20,6 +21,7 @@ pub struct BspEdge {
 /// It is recommended to compare these values via the provided methods and constants of this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightmapStyle(pub u8);
 impl LightmapStyle {
 	/// Unanimated lightmap.
@@ -49,6 +51,7 @@ impl std::fmt::Display for LightmapStyle {
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspFace {
 	/// Index of the plane the face is parallel to
 	pub plane_idx: UBspValue,
@@ -90,6 +93,7 @@ impl BspFace {
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfo {
 	pub u_axis: Vec3,
 	pub u_offset: f32,
@@ -103,6 +107,7 @@ pub struct BspTexInfo {
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(u32)]
 pub enum BspTexFlags {
 	#[default]
@@ -116,6 +121,7 @@ pub enum BspTexFlags {
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspModel {
 	pub bound: BoundingBox,
 	/// Origin of model, usually (0,0,0)
@@ -135,6 +141,7 @@ pub struct BspModel {
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspPlane {
 	pub normal: Vec3,
 	pub dist: f32,
@@ -160,6 +167,7 @@ impl BspPlane {
 /// Referenced from [this specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL1).
 #[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(u32)]
 pub enum BspPlaneType {
 	/// Axial plane, in X
@@ -195,6 +203,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspNode {
 	/// Index of the [`BspPlane`] that splits the node.
 	pub plane_idx: u32,
@@ -213,6 +222,7 @@ pub struct BspNode {
 /// A reference to a [`BspNode`]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum BspNodeRef {
 	Node(u32),
 	Leaf(u32),
@@ -238,6 +248,7 @@ impl BspValue for BspNodeRef {
 /// Wrapper over [`BspNodeRef`] that reads a [`IBspValue`] instead of an `i32`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct VariableBspNodeRef(pub BspNodeRef);
 impl BspValue for VariableBspNodeRef {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
@@ -259,6 +270,7 @@ impl BspValue for VariableBspNodeRef {
 /// I think it is also used for shape casting.
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspClipNode {
 	/// Index of the [`BspPlane`] that splits the clip node.
 	pub plane_idx: u32,
@@ -271,6 +283,7 @@ pub struct BspClipNode {
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(i32)]
 pub enum BspLeafContents {
 	#[default]
@@ -293,6 +306,7 @@ pub enum BspLeafContents {
 /// Wrapper for [`BspLeafContents`] that reads an [`i16`] rather than an [`i32`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ShortBspLeafContents(pub BspLeafContents);
 impl BspValue for ShortBspLeafContents {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
@@ -308,6 +322,7 @@ impl BspValue for ShortBspLeafContents {
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspLeaf {
 	pub contents: BspLeafContents,
 	/// Beginning of visibility lists, or `-1`.
@@ -328,6 +343,7 @@ pub struct BspLeaf {
 
 #[derive(Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexture {
 	pub header: BspTextureHeader,
 	pub data: Option<Vec<u8>>,
@@ -378,6 +394,7 @@ impl std::fmt::Debug for BspTexture {
 
 #[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTextureHeader {
 	pub name: FixedStr<16>,
 
@@ -396,6 +413,7 @@ pub struct BspTextureHeader {
 /// Lighting data stored in a BSP file or a neighboring LIT file.
 #[derive(Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum BspLighting {
 	White(Vec<u8>),
 	Colored(Vec<[u8; 3]>),

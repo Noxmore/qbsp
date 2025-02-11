@@ -4,6 +4,7 @@ use crate::*;
 use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ComputeLightmapSettings {
 	/// The of a pixel is no lightmaps are stored there.
 	pub default_color: [u8; 3],

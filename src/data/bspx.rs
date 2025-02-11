@@ -7,6 +7,7 @@ pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxLumpEntry {
 	pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
 	pub entry: LumpEntry,
@@ -14,6 +15,7 @@ pub struct BspxLumpEntry {
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxDirectory {
 	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
 }
@@ -54,6 +56,7 @@ impl BspValue for BspxDirectory {
 /// Owned version of [`BspxDirectory`]. Convert via [`BspxData::new`].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxData {
 	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Vec<u8>>,
 }
