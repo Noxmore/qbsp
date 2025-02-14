@@ -494,7 +494,7 @@ pub struct LightmapAtlas {
 	pub data: LightmapAtlasData,
 }
 
-/// Maps dace indexes to normalized UV coordinates into a lightmap atlas.
+/// Maps face indexes to normalized UV coordinates into a lightmap atlas.
 pub type LightmapUvMap = HashMap<u32, SmallVec<[Vec2; 5]>>;
 
 /// The different ways a lightmap atlas can be stored.
