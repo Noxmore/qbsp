@@ -26,6 +26,19 @@ pub struct BspParseInput<'a> {
 	pub bsp: &'a [u8],
 	/// The optional .lit file for external colored lighting.
 	pub lit: Option<&'a [u8]>,
+
+	pub settings: BspParseSettings,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BspParseSettings {
+	/// If true, will use the `RGBLIGHTING` BSPX lump if it exists to supply [`BspData::lighting`].
+	pub use_bspx_rgb_lighting: bool,
+}
+impl Default for BspParseSettings {
+	fn default() -> Self {
+		Self { use_bspx_rgb_lighting: true }
+	}
 }
 
 #[derive(Debug, Clone, Error)]
@@ -204,7 +217,7 @@ pub struct BspData {
 impl BspData {
 	/// Parses the data from BSP input.
 	pub fn parse(input: BspParseInput) -> BspResult<Self> {
-		let BspParseInput { bsp, lit } = input;
+		let BspParseInput { bsp, lit, settings } = input;
 		if bsp.len() < 4 {
 			return Err(BspParseError::BufferOutOfBounds {
 				from: 0,
@@ -248,7 +261,13 @@ impl BspData {
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
 			lighting: if let Some(lit) = lit {
 				Some(BspLighting::read_lit(lit, &ctx, false).job("Parsing .lit file")?)
-			} else if let Some(lighting) = bspx.parse_rgb_lighting(&ctx) {
+			} else if let Some(lighting) = {
+				if settings.use_bspx_rgb_lighting {
+					bspx.parse_rgb_lighting(&ctx)
+				} else {
+					None
+				}
+			} {
 				Some(lighting?)
 			} else {
 				let lighting = lump_dir.lighting.get(bsp)?;
@@ -286,4 +305,29 @@ impl BspData {
 			(texture.header.name.as_str(), image)
 		})
 	}
+}
+
+#[cfg(test)]
+pub static EXAMPLE_BSP: &[u8] = include_bytes!("../assets/example.bsp");
+
+#[test]
+fn use_bspx_rgb_lighting() {
+	let with_usage = BspData::parse(BspParseInput {
+		bsp: EXAMPLE_BSP,
+		lit: None,
+		settings: BspParseSettings { use_bspx_rgb_lighting: true },
+	})
+	.unwrap();
+
+	let without_usage = BspData::parse(BspParseInput {
+		bsp: EXAMPLE_BSP,
+		lit: None,
+		settings: BspParseSettings {
+			use_bspx_rgb_lighting: false,
+		},
+	})
+	.unwrap();
+
+	assert!(matches!(with_usage.lighting, Some(BspLighting::Colored(_))));
+	assert!(without_usage.lighting.is_none());
 }

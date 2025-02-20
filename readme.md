@@ -14,9 +14,10 @@ Rust crate for parsing, and operating with Quake 1 BSP files.
 ```rust
 use qbsp::prelude::*;
 
-BspData::parse(BspParseInput {
+let _ = BspData::parse(BspParseInput {
     bsp: &[], // Data of the bsp file.
     lit: None, // Optional lit file for colored lighting if no `RGBLIGHTING` BSPX lump is present.
+    settings: BspParseSettings::default(),
 });
 ```
 

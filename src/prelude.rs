@@ -10,7 +10,7 @@ pub(crate) use thiserror::Error;
 
 pub(crate) use crate::util::*;
 
-pub use crate::{BspData, BspParseError, BspParseInput, QUAKE_PALETTE};
+pub use crate::{BspData, BspParseError, BspParseInput, BspParseSettings, QUAKE_PALETTE};
 
 #[cfg(feature = "meshing")]
 pub use crate::mesh::{
