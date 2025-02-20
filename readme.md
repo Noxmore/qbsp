@@ -22,4 +22,5 @@ BspData::parse(BspParseInput {
 
 # Future plans
 - More flexible meshing API
+- PVS data support
 - BSP writing
