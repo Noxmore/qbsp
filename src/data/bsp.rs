@@ -128,10 +128,12 @@ pub struct BspModel {
 	pub origin: Vec3,
 
 	pub head_bsp_node: BspNodeRef,
-	pub first_clip_node: BspNodeRef,
-	pub second_clip_node: BspNodeRef,
+	/// If positive, index of first clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
+	pub first_clip_node: i32,
+	/// If positive, index of second clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
+	pub second_clip_node: i32,
 	/// [The specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BLE) notes this as "usually zero".
-	pub node_id3: BspNodeRef,
+	pub node_id3: i32,
 
 	/// Number of visleafs not including the solid leaf 0
 	pub visleafs: u32,
