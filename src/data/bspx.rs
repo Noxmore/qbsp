@@ -110,6 +110,8 @@ impl BspxData {
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
 #[derive(BspValue, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridOctree {
 	pub step: Vec3,
 	pub size: UVec3, // TODO make sure this is always positive
@@ -121,6 +123,8 @@ pub struct LightGridOctree {
 }
 
 #[derive(BspValue, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridNode {
 	pub division_point: UVec3,
 	pub children: [u32; 8],
@@ -142,6 +146,8 @@ impl LightGridNode {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridLeaf {
 	pub mins: UVec3, // TODO make sure this is always positive
 	size: UVec3,     // TODO make sure this is always positive
@@ -195,6 +201,8 @@ impl LightGridLeaf {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LightGridCell {
 	/// Cell is out of bounds. (TODO is this true?)
 	Occluded,
@@ -222,12 +230,16 @@ impl BspValue for LightGridCell {
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightmapCellSample {
 	pub style: LightmapStyle,
 	pub color: [u8; 3],
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrushesIdx {
 	pub brush_count: u32,
 	/// Total plane count, for validation.
@@ -246,6 +258,8 @@ pub type BrushList = Vec<ModelBrushes>;
 
 /// Per-model brush information stored in the `BRUSHLIST` BSPX lump.
 #[derive(BspValue, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrushes {
 	/// Should be `1`.
 	pub version: u32,
@@ -254,6 +268,8 @@ pub struct ModelBrushes {
 }
 
 #[derive(BspValue, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrush {
 	pub bound: BoundingBox,
 	pub contents: ShortBspLeafContents,
@@ -262,7 +278,10 @@ pub struct ModelBrush {
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrushPlane {
 	pub normal: Vec3,
 	pub dist: f32,
 }
+
