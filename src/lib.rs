@@ -9,6 +9,8 @@ pub(crate) use data::{bsp::*, bspx::*, *};
 #[cfg(feature = "meshing")]
 pub mod mesh;
 
+#[cfg(test)]
+pub mod loading_tests;
 pub mod query;
 pub mod util;
 
@@ -305,29 +307,4 @@ impl BspData {
 			(texture.header.name.as_str(), image)
 		})
 	}
-}
-
-#[cfg(test)]
-pub static EXAMPLE_BSP: &[u8] = include_bytes!("../assets/example.bsp");
-
-#[test]
-fn use_bspx_rgb_lighting() {
-	let with_usage = BspData::parse(BspParseInput {
-		bsp: EXAMPLE_BSP,
-		lit: None,
-		settings: BspParseSettings { use_bspx_rgb_lighting: true },
-	})
-	.unwrap();
-
-	let without_usage = BspData::parse(BspParseInput {
-		bsp: EXAMPLE_BSP,
-		lit: None,
-		settings: BspParseSettings {
-			use_bspx_rgb_lighting: false,
-		},
-	})
-	.unwrap();
-
-	assert!(matches!(with_usage.lighting, Some(BspLighting::Colored(_))));
-	assert!(without_usage.lighting.is_none());
 }
