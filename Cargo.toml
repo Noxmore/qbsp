@@ -40,4 +40,4 @@ serde = { version = "1.0.217", features = ["derive"], optional = true }
 default = [ "meshing" ]
 meshing = [ "dep:texture_packer" ]
 bevy_reflect = [ "dep:bevy_reflect" ]
-serde = [ "dep:serde" ]
+serde = [ "dep:serde", "smallvec/serde" ]
