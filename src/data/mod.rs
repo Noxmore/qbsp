@@ -193,6 +193,7 @@ pub struct BspVariableArray<T, N> {
 	#[deref_mut]
 	#[into_iterator(owned, ref, ref_mut)]
 	pub inner: Vec<T>,
+	#[cfg_attr(feature = "bevy_reflect", reflect(ignore))]
 	_marker: PhantomData<N>,
 }
 impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue for BspVariableArray<T, N> {
