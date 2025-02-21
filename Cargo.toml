@@ -34,7 +34,7 @@ thiserror = "2.0"
 qbsp_macros = { version = "0.2.1", path = "qbsp_macros" }
 derive_more = { version = "2", features = ["deref", "deref_mut", "into_iterator"] }
 bevy_reflect = { version = "0", features = ["glam"], optional = true }
-serde = { version = "1.0.217", features = ["derive"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
 default = [ "meshing" ]
