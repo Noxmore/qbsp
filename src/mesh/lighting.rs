@@ -39,6 +39,8 @@ pub enum ComputeLightmapAtlasError {
 	},
 	#[error("No lightmaps")]
 	NoLightmaps,
+	#[error("DECOUPLED_LM BSPX lump is present, but failed to parse: {0}")]
+	InvalidDecoupledLM(BspParseError),
 }
 
 #[derive(Default)]
@@ -73,6 +75,19 @@ impl BspData {
 		ty: LightmapAtlasType,
 	) -> Result<LightmapAtlas, ComputeLightmapAtlasError> {
 		let Some(lighting) = &self.lighting else { return Err(ComputeLightmapAtlasError::NoLightmaps) };
+		let mut decoupled_lm = match self.bspx.parse_decoupled_lm(&self.parse_ctx) {
+			Some(x) => Some(x.map_err(ComputeLightmapAtlasError::InvalidDecoupledLM)?),
+			None => None,
+		};
+
+		// This is done in FTE quake's source code, each with a comment saying "sigh" after, not sure why.
+		if let Some(lm_infos) = &mut decoupled_lm {
+			for lm_info in lm_infos {
+				lm_info.projection.u_offset += 0.5;
+				lm_info.projection.v_offset += 0.5;
+			}
+		}
+		// let decoupled_lm: Option<DecoupledLightmaps> = None;
 
 		let config = TexturePackerConfig {
 			max_width: settings.max_width,
@@ -89,14 +104,33 @@ impl BspData {
 		let mut empty_reserved_pixel = ReservedLightmapPixel::default();
 		let mut special_reserved_pixel = ReservedLightmapPixel::default();
 
+		let get_lm_info = |face_idx: usize, face: &BspFace, tex_info: &BspTexInfo| -> (Vec<Vec2>, FaceExtents, usize) {
+			let lm_info = decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
+
+			match &lm_info {
+				Some(lm_info) => {
+					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
+					let extents = FaceExtents::new_decoupled(uvs.iter().copied(), lm_info);
+
+					(uvs, extents, lm_info.offset as usize)
+				}
+				None => {
+					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
+					let extents = FaceExtents::new(uvs.iter().copied());
+
+					(uvs, extents, face.lightmap_offset as usize)
+				}
+			}
+		};
+
 		let atlas = match ty {
 			LightmapAtlasType::PerStyle => {
 				let mut lightmap_packer = PerStyleLightmapPacker::new(config);
 
 				for (face_idx, face) in self.faces.iter().enumerate() {
-					if face.lightmap_offset.is_negative() {
-						let tex_info = self.tex_info[face.texture_info_idx.0 as usize];
+					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
+					if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
 						lightmap_uvs.insert(
 							face_idx as u32,
 							if tex_info.flags != BspTexFlags::Normal {
@@ -112,12 +146,9 @@ impl BspData {
 						continue;
 					}
 
-					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
+					let (uvs, extents, lightmap_offset) = get_lm_info(face_idx, face, tex_info);
 
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| world_uv(pos, tex_info)).collect();
-					let extents = FaceExtents::new(uvs.iter().copied());
-
-					let lightmaps = Lightmaps::read_from_face(face, &extents, lighting);
+					let lightmaps = Lightmaps::read_from_face(lightmap_offset, face, &extents, lighting);
 
 					let frame = lightmap_packer.pack(face, lightmaps)?;
 
@@ -131,9 +162,9 @@ impl BspData {
 				let mut lightmap_packer = PerSlotLightmapPacker::new(config);
 
 				for (face_idx, face) in self.faces.iter().enumerate() {
-					if face.lightmap_offset.is_negative() {
-						let tex_info = self.tex_info[face.texture_info_idx.0 as usize];
+					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
+					if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
 						lightmap_uvs.insert(
 							face_idx as u32,
 							if tex_info.flags != BspTexFlags::Normal {
@@ -159,10 +190,7 @@ impl BspData {
 						continue;
 					}
 
-					let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| world_uv(pos, tex_info)).collect();
-					let extents = FaceExtents::new(uvs.iter().copied());
+					let (uvs, extents, lightmap_offset) = get_lm_info(face_idx, face, tex_info);
 
 					let mut i = 0;
 					let lightmaps = face.lightmap_styles.map(|style| {
@@ -170,7 +198,11 @@ impl BspData {
 							if style == LightmapStyle::NONE {
 								image::Rgb(settings.default_color)
 							} else {
-								image::Rgb(lighting.get(compute_lighting_index(face, &extents, i, x, y)).unwrap_or_default())
+								image::Rgb(
+									lighting
+										.get(compute_lighting_index(lightmap_offset, &extents, i, x, y))
+										.unwrap_or_default(),
+								)
 							}
 						});
 
@@ -406,7 +438,7 @@ impl Lightmaps {
 		}
 	}
 
-	pub fn read_from_face(face: &BspFace, extents: &FaceExtents, lighting: &BspLighting) -> Self {
+	pub fn read_from_face(lightmap_offset: usize, face: &BspFace, extents: &FaceExtents, lighting: &BspLighting) -> Self {
 		if face.lightmap_offset.is_negative() || face.lightmap_styles[0] == LightmapStyle::NONE {
 			Lightmaps::new_single_color(extents.lightmap_size(), [0; 3])
 		} else {
@@ -419,7 +451,11 @@ impl Lightmaps {
 					.insert(
 						style,
 						image::RgbImage::from_fn(extents.lightmap_size().x, extents.lightmap_size().y, |x, y| {
-							image::Rgb(lighting.get(compute_lighting_index(face, extents, i, x, y)).unwrap_or_default())
+							image::Rgb(
+								lighting
+									.get(compute_lighting_index(lightmap_offset, extents, i, x, y))
+									.unwrap_or_default(),
+							)
 						}),
 					)
 					.unwrap();

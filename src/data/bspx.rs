@@ -106,6 +106,25 @@ impl BspxData {
 
 		Some(Ok(brush_list))
 	}
+
+	/// Parses the `DECOUPLED_LM` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	pub fn parse_decoupled_lm(&self, ctx: &BspParseContext) -> Option<BspResult<DecoupledLightmaps>> {
+		let mut reader = BspByteReader::new(self.get("DECOUPLED_LM")?, ctx);
+		let mut lm_infos = DecoupledLightmaps::new();
+
+		let mut i: usize = 0;
+		while reader.in_bounds() {
+			let lm_info = match reader.read().job(format!("Parsing DECOUPLED_LM BSPX lump element {i}")) {
+				Ok(v) => v,
+				Err(err) => return Some(Err(err)),
+			};
+
+			lm_infos.push(lm_info);
+			i += 1;
+		}
+
+		Some(Ok(lm_infos))
+	}
 }
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
@@ -285,3 +304,16 @@ pub struct ModelBrushPlane {
 	pub dist: f32,
 }
 
+/// For the `DECOUPLED_LM` BSPX lump. Stores lightmap sizes and axes separately to textures. This vector is per-surface.
+pub type DecoupledLightmaps = Vec<DecoupledLightmap>;
+
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct DecoupledLightmap {
+	// TODO tmp fix until bevy_reflect 0.16, where i can make this U16Vec3 again
+	pub size: [u16; 2],
+	pub offset: u32,
+
+	pub projection: PlanarTextureProjection,
+}

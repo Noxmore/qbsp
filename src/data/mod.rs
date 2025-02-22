@@ -184,6 +184,29 @@ pub type UBspValue = BspVariableValue<u32, u16>;
 /// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
 pub type IBspValue = BspVariableValue<i32, i16>;
 
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct PlanarTextureProjection {
+	pub u_axis: Vec3,
+	pub u_offset: f32,
+
+	pub v_axis: Vec3,
+	pub v_offset: f32,
+}
+impl PlanarTextureProjection {
+	/// Projects a position onto this plane.
+	///
+	/// Converts to double for calculation to minimise floating-point imprecision as demonstrated [here](https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315).
+	pub fn project(&self, point: Vec3) -> Vec2 {
+		dvec2(
+			point.as_dvec3().dot(self.u_axis.as_dvec3()) + self.u_offset as f64,
+			point.as_dvec3().dot(self.v_axis.as_dvec3()) + self.v_offset as f64,
+		)
+		.as_vec2()
+	}
+}
+
 /// A variable length array in the format of `N` (count) then `[T; N]` (elements).
 #[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]

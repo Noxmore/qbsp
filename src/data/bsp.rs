@@ -95,11 +95,7 @@ impl BspFace {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfo {
-	pub u_axis: Vec3,
-	pub u_offset: f32,
-
-	pub v_axis: Vec3,
-	pub v_offset: f32,
+	pub projection: PlanarTextureProjection,
 
 	pub texture_idx: u32,
 	pub flags: BspTexFlags,

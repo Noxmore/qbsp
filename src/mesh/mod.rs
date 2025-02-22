@@ -79,10 +79,9 @@ impl BspData {
 					mesh.positions.push(pos);
 					mesh.normals.push(if face.plane_side.0 == 0 { plane.normal } else { -plane.normal });
 
-					let uv = world_uv(pos, tex_info);
+					let uv = tex_info.projection.project(pos);
 
 					mesh.uvs.push(uv / texture_size);
-					// Lightmap uvs have a constant scale of 16-units to 1 texel
 					lightmap_world_uvs.push(uv);
 				}
 
@@ -107,22 +106,10 @@ impl BspData {
 	}
 }
 
-/// Calculates a world UV coordinate from a position and texture info.
-///
-/// Converts to double for calculation to minimise floating-point imprecision as demonstrated [here](https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315).
-#[inline]
-pub fn world_uv(pos: Vec3, tex_info: &BspTexInfo) -> Vec2 {
-	dvec2(
-		pos.as_dvec3().dot(tex_info.u_axis.as_dvec3()) + tex_info.u_offset as f64,
-		pos.as_dvec3().dot(tex_info.v_axis.as_dvec3()) + tex_info.v_offset as f64,
-	)
-	.as_vec2()
-}
-
 /// Computes the index into [`BspLighting`] for the specific face specified.
 #[inline]
-pub fn compute_lighting_index(face: &BspFace, extents: &FaceExtents, light_style_idx: usize, x: u32, y: u32) -> usize {
-	face.lightmap_offset as usize + (extents.lightmap_pixels() as usize * light_style_idx) + (y * extents.lightmap_size().x + x) as usize
+pub fn compute_lighting_index(lightmap_offset: usize, extents: &FaceExtents, light_style_idx: usize, x: u32, y: u32) -> usize {
+	lightmap_offset + (extents.lightmap_pixels() as usize * light_style_idx) + (y * extents.lightmap_size().x + x) as usize
 }
 
 /// Computed extents of a face for various calculations, mainly involving lightmaps.
@@ -134,6 +121,8 @@ pub struct FaceExtents {
 	lightmap_rect: Rect<IVec2>,
 	lightmap_size: UVec2,
 	lightmap_pixels: u32,
+
+	precomputed_uv_snap: bool,
 }
 impl FaceExtents {
 	/// Calculates face extents from unscaled UVs.
@@ -154,6 +143,24 @@ impl FaceExtents {
 		);
 
 		extents.lightmap_size = extents.lightmap_rect.size().as_uvec2() + 1;
+
+		extents.lightmap_pixels = extents.lightmap_size.element_product();
+
+		extents
+	}
+
+	pub fn new_decoupled(uvs: impl IntoIterator<Item = Vec2>, lm_info: &DecoupledLightmap) -> Self {
+		let mut extents = Self {
+			face_rect: Rect::EMPTY,
+			precomputed_uv_snap: true,
+			..Default::default()
+		};
+
+		for uv in uvs {
+			extents.face_rect = extents.face_rect.union_point(uv);
+		}
+
+		extents.lightmap_size = U16Vec2::from_array(lm_info.size).as_uvec2();
 
 		extents.lightmap_pixels = extents.lightmap_size.element_product();
 
@@ -184,15 +191,23 @@ impl FaceExtents {
 		self.lightmap_pixels
 	}
 
+	/// `true` if the projection data implicitly puts the uvs at around 0, 0
+	#[inline]
+	pub fn precomputed_uv_snap(&self) -> bool {
+		self.precomputed_uv_snap
+	}
+
 	/// Computes texture-space lightmap UVs, provide the same set of face UVs supplied to [`FaceExtents::new`], and the position of the lightmap on the atlas.
 	pub fn compute_lightmap_uvs<'a>(&'a self, uvs: impl IntoIterator<Item = Vec2> + 'a, lightmap_position: Vec2) -> impl Iterator<Item = Vec2> + 'a {
 		uvs.into_iter().map(move |mut uv| {
-			// Move from world space into top left corner
-			uv -= (self.lightmap_rect.min * 16).as_vec2();
-			// Offset by half a texel to remove bleeding artifacts
-			uv += 8.;
-			// 16 Units per texel
-			uv /= 16.;
+			if !self.precomputed_uv_snap {
+				// Move from world space into top left corner
+				uv -= (self.lightmap_rect.min * 16).as_vec2();
+				// Offset by half a texel to remove bleeding artifacts
+				uv += 8.;
+				// 16 Units per texel
+				uv /= 16.;
+			}
 			// Finally, move to where the lightmap starts
 			uv += lightmap_position;
 

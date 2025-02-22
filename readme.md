@@ -8,7 +8,7 @@ Rust crate for parsing, and operating with Quake 1 BSP files.
 - BSP raycasting.
 - Mesh generation.
 - Lightmap atlas generation either per-style or per-slot (`.lit` supported).
-- BSPX support, including built-in structures for the `RGBLIGHTING`, `LIGHTGRID_OCTREE`, and `BRUSHLIST` lumps.
+- BSPX support, including built-in structures/support for the `RGBLIGHTING`, `LIGHTGRID_OCTREE`, `BRUSHLIST`, and `DECOUPLED_LM` lumps.
 
 ## How to use
 ```rust

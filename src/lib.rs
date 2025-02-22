@@ -34,7 +34,7 @@ pub struct BspParseInput<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BspParseSettings {
-	/// If true, will use the `RGBLIGHTING` BSPX lump if it exists to supply [`BspData::lighting`].
+	/// If `true`, will use the `RGBLIGHTING` BSPX lump if it exists to supply [`BspData::lighting`]. (Default: `true`)
 	pub use_bspx_rgb_lighting: bool,
 }
 impl Default for BspParseSettings {
