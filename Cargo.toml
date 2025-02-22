@@ -2,7 +2,7 @@
 members = [ "qbsp_macros" ]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 description = "Rust crate for parsing and operating with Quake 1 BSP files"
 edition = "2021"
 authors = ["Noxmore"]
