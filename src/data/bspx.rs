@@ -133,7 +133,7 @@ impl BspxData {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridOctree {
 	pub step: Vec3,
-	pub size: UVec3, // TODO make sure this is always positive
+	pub size: UVec3,
 	pub mins: Vec3,
 	pub num_styles: u8,
 	pub root_idx: u32,
@@ -149,27 +149,26 @@ pub struct LightGridNode {
 	pub children: [u32; 8],
 }
 impl LightGridNode {
-	// TODO what do these do?
 	pub const LEAF: u32 = 1 << 31;
 	pub const MISSING: u32 = 1 << 30;
 
-    #[rustfmt::skip]
+	#[rustfmt::skip]
 	#[allow(clippy::identity_op)]
 	pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
-        self.children[
-            (((point.z >= self.division_point.z as f32) as usize) << 0) |
-            (((point.y >= self.division_point.y as f32) as usize) << 1) |
-            (((point.x >= self.division_point.x as f32) as usize) << 2)
-        ]
-    }
+		self.children[
+			(((point.z >= self.division_point.z as f32) as usize) << 0) |
+			(((point.y >= self.division_point.y as f32) as usize) << 1) |
+			(((point.x >= self.division_point.x as f32) as usize) << 2)
+		]
+	}
 }
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridLeaf {
-	pub mins: UVec3, // TODO make sure this is always positive
-	size: UVec3,     // TODO make sure this is always positive
+	pub mins: UVec3,
+	size: UVec3,
 
 	data: Vec<LightGridCell>,
 }
@@ -223,7 +222,7 @@ impl LightGridLeaf {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum LightGridCell {
-	/// Cell is out of bounds. (TODO is this true?)
+	/// Cell is filled by geometry.
 	Occluded,
 	/// Cell is filled,
 	Filled(SmallVec<[LightmapCellSample; 4]>),

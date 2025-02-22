@@ -87,7 +87,6 @@ impl BspData {
 				lm_info.projection.v_offset += 0.5;
 			}
 		}
-		// let decoupled_lm: Option<DecoupledLightmaps> = None;
 
 		let config = TexturePackerConfig {
 			max_width: settings.max_width,

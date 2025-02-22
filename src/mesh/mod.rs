@@ -34,7 +34,7 @@ pub struct MeshModelOutput {
 
 impl BspData {
 	// TODO I would like this to be more powerful, being able to change things like where meshes split and such would be nice, but i can't think of a good API for it.
-	//      Also, support vis data.
+	//      Also, support PVS data.
 
 	/// Meshes a model at the specified index. Returns one mesh for each texture used in the model.
 	pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&LightmapUvMap>) -> MeshModelOutput {
