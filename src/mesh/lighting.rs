@@ -155,7 +155,10 @@ impl BspData {
 
 					let frame = lightmap_packer.pack(face, lightmaps)?;
 
-					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect());
+					lightmap_uvs.insert(
+						face_idx as u32,
+						extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect(),
+					);
 				}
 
 				lightmap_packer.export(settings.default_color)
@@ -216,7 +219,10 @@ impl BspData {
 
 					let frame = lightmap_packer.pack(face, lightmaps)?;
 
-					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect());
+					lightmap_uvs.insert(
+						face_idx as u32,
+						extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect(),
+					);
 				}
 
 				lightmap_packer.export(settings.default_color)
@@ -402,14 +408,20 @@ impl LightmapPacker for PerSlotLightmapPacker {
 					for y in 0..frame_height + self.config.texture_extrusion * 2 {
 						let global_x = frame.min.x + x;
 						let global_y = frame.min.y + y;
-						if global_x >= size.x || global_y >= size.y { continue }
-						
+						if global_x >= size.x || global_y >= size.y {
+							continue;
+						}
+
 						styles.get_pixel_mut(global_x, global_y).0[slot_idx] = style.0;
 
-						dst_image.put_pixel(global_x, global_y, *slot_image.get_pixel(
-							x.saturating_sub(self.config.texture_extrusion).min(frame_width - 1),
-							y.saturating_sub(self.config.texture_extrusion).min(frame_height - 1),
-						));
+						dst_image.put_pixel(
+							global_x,
+							global_y,
+							*slot_image.get_pixel(
+								x.saturating_sub(self.config.texture_extrusion).min(frame_width - 1),
+								y.saturating_sub(self.config.texture_extrusion).min(frame_height - 1),
+							),
+						);
 					}
 				}
 			}
