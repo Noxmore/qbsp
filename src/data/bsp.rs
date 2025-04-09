@@ -3,7 +3,7 @@
 use super::*;
 use crate::*;
 
-#[derive(BspValue, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspEdge {
