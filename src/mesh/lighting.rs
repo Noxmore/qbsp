@@ -12,6 +12,8 @@ pub struct ComputeLightmapSettings {
 	pub no_lighting_color: [u8; 3],
 	/// A single pixel of a lightmap atlas is reserved for faces which don't have a lightmap, but do have the `special` flag, this is the color of that pixel.
 	pub special_lighting_color: [u8; 3],
+	/// Padding to add onto each island in pixels. Stretches the texture.
+	pub padding: u32,
 	pub max_width: u32,
 	pub max_height: u32,
 }
@@ -21,6 +23,7 @@ impl Default for ComputeLightmapSettings {
 			default_color: [0; 3],
 			no_lighting_color: [0; 3],
 			special_lighting_color: [255; 3],
+			padding: 0,
 			max_width: 2048,
 			max_height: u32::MAX,
 		}
@@ -94,6 +97,7 @@ impl BspData {
 			// Sizes are consistent enough that i don't think we need to support rotation
 			allow_rotation: false,
 			force_max_dimensions: false,
+			texture_extrusion: settings.padding,
 			texture_padding: 0, // This defaults to 1
 			..Default::default()
 		};
@@ -151,7 +155,7 @@ impl BspData {
 
 					let frame = lightmap_packer.pack(face, lightmaps)?;
 
-					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, frame.min.as_vec2()).collect());
+					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect());
 				}
 
 				lightmap_packer.export(settings.default_color)
@@ -212,7 +216,7 @@ impl BspData {
 
 					let frame = lightmap_packer.pack(face, lightmaps)?;
 
-					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, frame.min.as_vec2()).collect());
+					lightmap_uvs.insert(face_idx as u32, extents.compute_lightmap_uvs(uvs, (frame.min + settings.padding).as_vec2()).collect());
 				}
 
 				lightmap_packer.export(settings.default_color)
@@ -394,11 +398,18 @@ impl LightmapPacker for PerSlotLightmapPacker {
 				}
 				let dst_image = slots[slot_idx].get_or_insert_with(|| image::RgbImage::from_pixel(size.x, size.y, image::Rgb(default)));
 
-				for x in 0..frame_width {
-					for y in 0..frame_height {
-						styles.get_pixel_mut(frame.min.x + x, frame.min.y + y).0[slot_idx] = style.0;
+				for x in 0..frame_width + self.config.texture_extrusion * 2 {
+					for y in 0..frame_height + self.config.texture_extrusion * 2 {
+						let global_x = frame.min.x + x;
+						let global_y = frame.min.y + y;
+						if global_x >= size.x || global_y >= size.y { continue }
+						
+						styles.get_pixel_mut(global_x, global_y).0[slot_idx] = style.0;
 
-						dst_image.put_pixel(frame.min.x + x, frame.min.y + y, *slot_image.get_pixel(x, y));
+						dst_image.put_pixel(global_x, global_y, *slot_image.get_pixel(
+							x.saturating_sub(self.config.texture_extrusion).min(frame_width - 1),
+							y.saturating_sub(self.config.texture_extrusion).min(frame_height - 1),
+						));
 					}
 				}
 			}
