@@ -31,14 +31,14 @@ glam = "0.29"
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 strum = { version = "0.27", features = ["derive"] }
-texture_packer = { version = "0.29", optional = true }
+texture_packer = { version = "0.30", optional = true }
 thiserror = "2.0"
 derive_more = { version = "2", features = [
 	"deref",
 	"deref_mut",
 	"into_iterator",
 ] }
-bevy_reflect = { version = "0.16.0-rc.2", features = ["glam"], optional = true }
+bevy_reflect = { version = "0.16.0-rc.3", features = ["glam"], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
