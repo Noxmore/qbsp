@@ -38,7 +38,7 @@ derive_more = { version = "2", features = [
 	"deref_mut",
 	"into_iterator",
 ] }
-bevy_reflect = { version = "0.16.0-rc.3", features = ["glam"], optional = true }
+bevy_reflect = { version = "0.16.0-rc.4", features = ["glam"], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]
