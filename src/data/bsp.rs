@@ -301,7 +301,7 @@ pub enum BspLeafContents {
 	CurrentDown = -14,
 }
 
-/// Wrapper for [`BspLeafContents`] that reads an [`i16`] rather than an [`i32`].
+/// Wrapper for [`BspLeafContents`] that reads an [`prim@i16`] rather than an [`prim@i32`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
