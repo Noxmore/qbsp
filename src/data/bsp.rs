@@ -292,7 +292,7 @@ pub enum BspLeafContents {
 	Lava = -5,
 	Sky = -6,
 	// Origin = -7, removed at csg time
-	// Clip = -8, changed to contents_solid
+	Clip = -8,
 	Current0 = -9,
 	Current90 = -10,
 	Current180 = -11,
