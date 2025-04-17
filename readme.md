@@ -1,5 +1,8 @@
 # QBSP
 
+[![crates.io](https://img.shields.io/crates/v/qbsp)](https://crates.io/crates/qbsp)
+[![docs.rs](https://docs.rs/qbsp/badge.svg)](https://docs.rs/qbsp)
+
 Rust crate for parsing, and operating with Quake 1 BSP files.
 
 ## Features
