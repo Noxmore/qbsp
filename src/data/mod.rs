@@ -114,6 +114,8 @@ impl_bsp_parse_vector!(IVec3: [i32; 3]);
 impl_bsp_parse_vector!(UVec3: [u32; 3]);
 impl_bsp_parse_vector!(U16Vec3: [u16; 3]);
 
+impl_bsp_parse_vector!(U16Vec2: [u16; 2]);
+
 // We'd have to change this if we want to impl BspRead for u8
 impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 	#[inline]
@@ -132,7 +134,7 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 }
 
 /// A value in a BSP file where its size differs between formats.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, #[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<BSP29>);
@@ -331,15 +333,14 @@ pub struct BoundingBox {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ShortBoundingBox {
-	// TODO tmp fix until bevy_reflect 0.16, where i can make them U16Vec3 again
-	pub min: [u16; 3],
-	pub max: [u16; 3],
+	pub min: U16Vec3,
+	pub max: U16Vec3,
 }
 impl From<ShortBoundingBox> for BoundingBox {
 	fn from(value: ShortBoundingBox) -> Self {
 		Self {
-			min: Vec3::from_array(value.min.map(|x| x as f32)),
-			max: Vec3::from_array(value.max.map(|x| x as f32)),
+			min: value.min.as_vec3(),
+			max: value.max.as_vec3(),
 		}
 	}
 }
