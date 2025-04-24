@@ -1,6 +1,6 @@
 //! Turning [`BspData`] into a renderable mesh.
 
-pub mod lighting;
+pub mod lightmap;
 
 use crate::*;
 
