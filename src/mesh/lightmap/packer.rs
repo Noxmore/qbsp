@@ -1,25 +1,24 @@
 use super::*;
 use crate::*;
 
-use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
-
-/// A trait for packing lightmaps into texture atlas'. Specifically using image::RgbImage.
-pub trait LightmapPacker {
+/// A trait for packing lightmaps into texture atlas'.
+pub trait LightmapPacker: Sized {
 	type Input;
 	type Output: LightmapAtlas;
 
-	fn create_single_color_input(size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input;
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input;
+	fn read_single_color_from_face(view: LightmapPackerFaceReadView, size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input;
+	fn read_from_face(&self, view: LightmapPackerFaceReadView) -> Self::Input;
 
 	fn settings(&self) -> ComputeLightmapSettings;
 
-	fn pack(&mut self, face: &BspFace, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError>;
-	fn export(&self) -> Self::Output;
+	/// Returns the item index, a unique id for each pushed lightmap.
+	fn push(&mut self, item: Self::Input) -> usize;
+	fn export(self) -> Result<LightmapAtlasExport<Self>, ComputeLightmapAtlasError>;
 }
 
 /// Information provided to read a lightmap from a face.
 #[derive(Clone, Copy)]
-pub struct LightmapPackerFaceReaderView<'a> {
+pub struct LightmapPackerFaceReadView<'a> {
 	pub lm_info: &'a LightmapInfo,
 
 	pub bsp: &'a BspData,
@@ -33,100 +32,36 @@ pub struct LightmapPackerFaceReaderView<'a> {
 	pub lighting: &'a BspLighting,
 }
 
-/// Currently, we use texture_packer to create atlas' and have to do
-/// this dummy texture and pixel stuff to get around the fact the packer
-/// doesn't expose its textures.
-#[derive(Clone, Copy)]
-struct DummyTexture {
-	width: u32,
-	height: u32,
-}
-#[derive(Clone, Copy)]
-struct DummyPixel;
-impl texture_packer::texture::Pixel for DummyPixel {
-	fn is_transparent(&self) -> bool {
-		false
-	}
-	fn outline() -> Self {
-		Self
-	}
-	fn transparency() -> Option<Self> {
-		None
-	}
-}
-impl Texture for DummyTexture {
-	type Pixel = DummyPixel;
-	fn width(&self) -> u32 {
-		self.width
-	}
-	fn height(&self) -> u32 {
-		self.height
-	}
-	fn get(&self, x: u32, y: u32) -> Option<Self::Pixel> {
-		(x < self.width && y < self.height).then_some(DummyPixel)
-	}
-	#[allow(unused)]
-	fn set(&mut self, x: u32, y: u32, val: Self::Pixel) {}
+#[derive(Clone)]
+pub struct DefaultPackerItem<LM> {
+	pub lm_info: LightmapInfo,
+	pub face_idx: usize,
+	pub lightmap: LM,
 }
 
 pub struct DefaultLightmapPacker<LM> {
-	packer: TexturePacker<'static, DummyTexture, u32>,
+	/// Stores a packer of lightmap offsets
+	items: Vec<crunch::Item<DefaultPackerItem<LM>>>,
 	settings: ComputeLightmapSettings,
-	// I have to store images separately, since TexturePacker doesn't give me access
-	images: Vec<(Rect<UVec2>, LM)>,
 }
 impl<LM> DefaultLightmapPacker<LM> {
 	pub fn new(settings: ComputeLightmapSettings) -> Self {
 		Self {
-			packer: TexturePacker::new_skyline(TexturePackerConfig {
-				max_width: settings.max_width,
-				max_height: settings.max_height,
-				// Sizes are consistent enough that i don't think we need to support rotation
-				allow_rotation: false,
-				force_max_dimensions: false,
-				texture_padding: 0, // This defaults to 1
-				..Default::default()
-			}),
+			items: Vec::new(),
 			settings,
-			images: Vec::new(),
 		}
 	}
 
-	fn allocate_and_push(&mut self, face: &BspFace, width: u32, height: u32, lm: LM) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
-		self.packer
-			.pack_own(face.lightmap_offset as u32, DummyTexture { width, height })
-			.map_err(|_| ComputeLightmapAtlasError::PackFailure {
-				lightmap_size: uvec2(width, height),
-				images_packed: self.images.len(),
-				max_lightmap_size: uvec2(self.settings.max_width, self.settings.max_height),
-			})?;
-
-		Ok(self
-			.packer
-			.get_frame(&(face.lightmap_offset as u32))
-			.map(|frame| {
-				let min = uvec2(frame.frame.x, frame.frame.y);
-				let rect = Rect {
-					min,
-					max: min + uvec2(frame.frame.w, frame.frame.h),
-				};
-
-				self.images.push((rect, lm));
-
-				rect
-			})
-			.unwrap())
-	}
-
-	fn total_size(&self) -> UVec2 {
-		// TODO the packer and this give different sizes
-		let mut size = UVec2::ZERO;
-
-		for (frame, _) in &self.images {
-			size = size.max(frame.max);
-		}
-
-		size
+	fn push_internal(&mut self, width: u32, height: u32, item: DefaultPackerItem<LM>) -> usize {
+		let idx = self.items.len();
+		self.items.push(crunch::Item {
+			data: item,
+			w: width as usize,
+			h: height as usize,
+			// TODO:
+			rot: crunch::Rotation::None,
+		});
+		idx
 	}
 }
 
@@ -134,27 +69,32 @@ pub type PerStyleLightmapPacker = DefaultLightmapPacker<PerStyleLightmapData>;
 pub type PerSlotLightmapPacker = DefaultLightmapPacker<[(image::RgbImage, LightmapStyle); 4]>;
 
 impl LightmapPacker for PerStyleLightmapPacker {
-	type Input = PerStyleLightmapData;
+	type Input = DefaultPackerItem<PerStyleLightmapData>;
 	type Output = PerStyleLightmapData;
 
-	fn create_single_color_input(size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input {
+	fn read_single_color_from_face(view: LightmapPackerFaceReadView, size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input {
 		let size = size.into();
-		PerStyleLightmapData {
-			size,
-			inner: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]),
+		DefaultPackerItem {
+			lm_info: view.lm_info.clone(),
+			face_idx: view.face_idx,
+			lightmap: PerStyleLightmapData {
+				size,
+				inner: HashMap::from([(LightmapStyle::NORMAL, image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)))]),
+			},
 		}
 	}
 
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input {
+	fn read_from_face(&self, view: LightmapPackerFaceReadView) -> Self::Input {
+		// TODO: we should probably get rid of this lightmap_offset check
 		if view.face.lightmap_offset.is_negative() || view.face.lightmap_styles[0] == LightmapStyle::NONE {
-			Self::create_single_color_input(view.lm_info.extents.lightmap_size(), [0; 3])
+			Self::read_single_color_from_face(view, view.lm_info.extents.lightmap_size(), [0; 3])
 		} else {
-			let mut lightmaps = PerStyleLightmapData::new(view.lm_info.extents.lightmap_size());
+			let mut lightmap = PerStyleLightmapData::new(view.lm_info.extents.lightmap_size());
 			for (i, style) in view.face.lightmap_styles.into_iter().enumerate() {
 				if style == LightmapStyle::NONE {
 					break;
 				}
-				lightmaps
+				lightmap
 					.insert(
 						style,
 						image::RgbImage::from_fn(view.lm_info.extents.lightmap_size().x, view.lm_info.extents.lightmap_size().y, |x, y| {
@@ -163,7 +103,12 @@ impl LightmapPacker for PerStyleLightmapPacker {
 					)
 					.unwrap();
 			}
-			lightmaps
+
+			DefaultPackerItem {
+				lm_info: view.lm_info.clone(),
+				face_idx: view.face_idx,
+				lightmap,
+			}
 		}
 	}
 
@@ -171,27 +116,36 @@ impl LightmapPacker for PerStyleLightmapPacker {
 		self.settings
 	}
 
-	fn pack(&mut self, face: &BspFace, lightmaps: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
-		self.allocate_and_push(face, lightmaps.size().x, lightmaps.size().y, lightmaps)
+	fn push(&mut self, input: Self::Input) -> usize {
+		self.push_internal(input.lightmap.size().x, input.lightmap.size().y, input)
 	}
 
-	fn export(&self) -> Self::Output {
-		let mut atlas = PerStyleLightmapData::new(self.total_size());
+	fn export(self) -> Result<LightmapAtlasExport<Self>, ComputeLightmapAtlasError> {
+		let rect = crunch::Rect::new(0, 0, self.settings.max_width as usize, self.settings.max_height as usize);
+		
+		let packed_items = match crunch::pack(rect, self.items) {
+			Ok(x) => x,
+			// TODO:
+			Err(err) => return Err(ComputeLightmapAtlasError::PackFailure { lightmap_size: UVec2::ZERO, images_packed: 0, max_lightmap_size: UVec2::ZERO }),
+		};
+
+		let total_x = packed_items.iter().map(|item| item.rect.right()).max().unwrap_or_default() as u32;
+		let total_y = packed_items.iter().map(|item| item.rect.bottom()).max().unwrap_or_default() as u32;
+		
+		let mut atlas = PerStyleLightmapData::new([total_x, total_y]);
 		let [atlas_width, atlas_height] = atlas.size().to_array();
 
-		for (frame, lightmap_images) in &self.images {
-			let [frame_width, frame_height] = frame.size().to_array();
-
-			for (light_style, lightmap_image) in lightmap_images.inner() {
+		for packed_item in packed_items {
+			for (light_style, lightmap_image) in packed_item.data.lightmap.inner() {
 				atlas
 					.modify_inner(|map| {
 						let dst_image = map
 							.entry(*light_style)
 							.or_insert_with(|| image::RgbImage::from_pixel(atlas_width, atlas_height, image::Rgb(self.settings.default_color)));
 
-						for x in 0..frame_width {
-							for y in 0..frame_height {
-								dst_image.put_pixel(frame.min.x + x, frame.min.y + y, *lightmap_image.get_pixel(x, y));
+						for x in 0..packed_item.rect.w as u32 {
+							for y in 0..packed_item.rect.h as u32 {
+								dst_image.put_pixel(packed_item.rect.x as u32 + x, packed_item.rect.y as u32 + y, *lightmap_image.get_pixel(x, y));
 							}
 						}
 					})
@@ -199,87 +153,115 @@ impl LightmapPacker for PerStyleLightmapPacker {
 			}
 		}
 
-		atlas
+		/* Ok(LightmapAtlasExport {
+			uvs,
+			atlas,
+		}) */
+		todo!()
 	}
 }
 
 impl LightmapPacker for PerSlotLightmapPacker {
-	type Input = [(image::RgbImage, LightmapStyle); 4];
+	type Input = DefaultPackerItem<[(image::RgbImage, LightmapStyle); 4]>;
 	type Output = PerSlotLightmapData;
 
-	fn create_single_color_input(size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input {
+	fn read_single_color_from_face(view: LightmapPackerFaceReadView, size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input {
 		let size: UVec2 = size.into();
-		[(); 4].map(|_| (image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)), LightmapStyle::NORMAL))
+		DefaultPackerItem {
+			lm_info: view.lm_info.clone(),
+			face_idx: view.face_idx,
+			lightmap: [(); 4].map(|_| (image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)), LightmapStyle::NORMAL)),
+		}
 	}
 
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input {
+	fn read_from_face(&self, view: LightmapPackerFaceReadView) -> Self::Input {
 		let mut i = 0;
-		view.face.lightmap_styles.map(|style| {
-			let image = image::RgbImage::from_fn(view.lm_info.extents.lightmap_size().x, view.lm_info.extents.lightmap_size().y, |x, y| {
-				if style == LightmapStyle::NONE {
-					image::Rgb(self.settings.default_color)
-				} else {
-					image::Rgb(view.lighting.get(view.lm_info.compute_lighting_index(i, x, y)).unwrap_or_default())
-				}
-			});
-
-			i += 1;
-
-			(image, style)
-		})
+		DefaultPackerItem {
+			lm_info: view.lm_info.clone(),
+			face_idx: view.face_idx,
+			lightmap: view.face.lightmap_styles.map(|style| {
+				let image = image::RgbImage::from_fn(view.lm_info.extents.lightmap_size().x, view.lm_info.extents.lightmap_size().y, |x, y| {
+					if style == LightmapStyle::NONE {
+						image::Rgb(self.settings.default_color)
+					} else {
+						image::Rgb(view.lighting.get(view.lm_info.compute_lighting_index(i, x, y)).unwrap_or_default())
+					}
+				});
+	
+				i += 1;
+	
+				(image, style)
+			})
+		}
 	}
 
 	fn settings(&self) -> ComputeLightmapSettings {
 		self.settings
 	}
 
-	fn pack(&mut self, face: &BspFace, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
-		let size = images
+	fn push(&mut self, input: Self::Input) -> usize {
+		let size = input.lightmap
 			.iter()
 			.map(|(image, _)| uvec2(image.width(), image.height()))
 			.reduce(UVec2::max)
 			.unwrap();
 
-		self.allocate_and_push(face, size.x, size.y, images)
+		self.push_internal(size.x, size.y, input)
 	}
 
-	fn export(&self) -> Self::Output {
-		let size = self.total_size();
+	fn export(self) -> Result<LightmapAtlasExport<Self>, ComputeLightmapAtlasError> {
+		let rect = crunch::Rect::new(0, 0, self.settings.max_width as usize, self.settings.max_height as usize);
+		
+		let packed_items = match crunch::pack(rect, self.items) {
+			Ok(x) => x,
+			// TODO:
+			Err(err) => return Err(ComputeLightmapAtlasError::PackFailure { lightmap_size: UVec2::ZERO, images_packed: 0, max_lightmap_size: UVec2::ZERO }),
+		};
+
+		let total_x = packed_items.iter().map(|item| item.rect.right()).max().unwrap_or_default() as u32;
+		let total_y = packed_items.iter().map(|item| item.rect.bottom()).max().unwrap_or_default() as u32;
 
 		let mut slots = [(); 4].map(|_| None);
-		let mut styles = image::RgbaImage::from_pixel(size.x, size.y, image::Rgba([255; 4]));
+		let mut styles = image::RgbaImage::from_pixel(total_x, total_y, image::Rgba([255; 4]));
 
-		for (frame, src_slots) in &self.images {
-			let [frame_width, frame_height] = frame.size().to_array();
-
-			for (slot_idx, (slot_image, style)) in src_slots.iter().enumerate() {
+		let mut uvs = HashMap::new();
+		
+		for packed_item in packed_items {
+			uvs.insert(packed_item.data.face_idx as u32, packed_item.data.lm_info.extents.compute_lightmap_uvs(packed_item.data.lm_info.uvs, vec2(packed_item.rect.x as f32, packed_item.rect.y as f32)).collect());
+			
+			for (slot_idx, (slot_image, style)) in packed_item.data.lightmap.iter().enumerate() {
 				if *style == LightmapStyle::NONE {
 					continue;
 				}
 				let dst_image =
-					slots[slot_idx].get_or_insert_with(|| image::RgbImage::from_pixel(size.x, size.y, image::Rgb(self.settings.default_color)));
+					slots[slot_idx].get_or_insert_with(|| image::RgbImage::from_pixel(total_x, total_y, image::Rgb(self.settings.default_color)));
 
-				for x in 0..frame_width {
-					for y in 0..frame_height {
-						styles.get_pixel_mut(frame.min.x + x, frame.min.y + y).0[slot_idx] = style.0;
+				for x in 0..packed_item.rect.w as u32 {
+					for y in 0..packed_item.rect.h as u32 {
+						styles.get_pixel_mut(packed_item.rect.x as u32 + x, packed_item.rect.y as u32 + y).0[slot_idx] = style.0;
 
-						dst_image.put_pixel(frame.min.x + x, frame.min.y + y, *slot_image.get_pixel(x, y));
+						dst_image.put_pixel(packed_item.rect.x as u32 + x, packed_item.rect.y as u32 + y, *slot_image.get_pixel(x, y));
 					}
 				}
 			}
 		}
 
-		PerSlotLightmapData {
-			slots: slots.map(|image| image.unwrap_or_else(|| image::RgbImage::from_pixel(1, 1, image::Rgb(self.settings.default_color)))),
-			styles,
-		}
+		Ok(LightmapAtlasExport {
+			uvs,
+			atlas: PerSlotLightmapData {
+				slots: slots.map(|image| image.unwrap_or_else(|| image::RgbImage::from_pixel(1, 1, image::Rgb(self.settings.default_color)))),
+				styles,
+			},
+		})
 	}
 }
 
 /// Maps face indexes to normalized UV coordinates into a lightmap atlas. The vast majority of faces have 5 or less vertices.
 pub type LightmapUvMap = HashMap<u32, SmallVec<[Vec2; 5]>>;
 
-pub trait LightmapPackerBackend {}
-
-pub struct SkylinePackerBackend;
-pub struct CrunchPackerBackend;
+// /// Intermediate step 
+pub struct LightmapAtlasExport<P: LightmapPacker> {
+	/// Map of face indexes to normalized UV coordinates into the atlas.
+	pub uvs: LightmapUvMap,
+	pub atlas: P::Output,
+}

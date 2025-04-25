@@ -45,32 +45,40 @@ pub enum ComputeLightmapAtlasError {
 }
 
 struct ReservedLightmapPixel {
-	position: Option<UVec2>,
+	index: Option<usize>,
 	color: [u8; 3],
 }
 impl ReservedLightmapPixel {
 	pub fn new(color: [u8; 3]) -> Self {
-		Self { position: None, color }
+		Self { index: None, color }
 	}
 
-	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, face: &BspFace) -> Result<SmallVec<[Vec2; 5]>, ComputeLightmapAtlasError> {
-		let position = match self.position {
+	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, view: LightmapPackerFaceReadView) -> usize {
+		match self.index {
 			Some(v) => v,
 			None => {
 				// TODO: Padding for bicubic filtering
-				let rect = lightmap_packer.pack(face, P::create_single_color_input([1, 1], self.color))?;
-				self.position = Some(rect.min);
-				rect.min
+				let index = lightmap_packer.push(P::read_single_color_from_face(view, [1, 1], self.color));
+				self.index = Some(index);
+				index
 			}
-		};
+		}
 
-		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); face.num_edges.0 as usize])
+		// TODO:
+		// Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); view.face.num_edges.0 as usize])
 	}
 }
 
+/* /// Contains a lightmap packers' output, and the normalized UVs into said atlas' for each face.
+pub struct ComputedLightmapAtlas<P: LightmapPacker> {
+	/// Map of face indexes to normalized UV coordinates into the atlas.
+	pub uvs: LightmapUvMap,
+	pub atlas: P::Output,
+} */
+
 impl BspData {
 	/// Packs every face's lightmap together onto a single atlas for GPU rendering.
-	pub fn compute_lightmap_atlas<P: LightmapPacker>(&self, mut packer: P) -> Result<LightmapAtlasOutput<P>, ComputeLightmapAtlasError> {
+	pub fn compute_lightmap_atlas<P: LightmapPacker>(&self, mut packer: P) -> Result<LightmapAtlasExport<P>, ComputeLightmapAtlasError> {
 		let Some(lighting) = &self.lighting else { return Err(ComputeLightmapAtlasError::NoLightmaps) };
 		let mut decoupled_lm = match self.bspx.parse_decoupled_lm(&self.parse_ctx) {
 			Some(x) => Some(x.map_err(ComputeLightmapAtlasError::InvalidDecoupledLM)?),
@@ -87,7 +95,7 @@ impl BspData {
 
 		let settings = packer.settings();
 
-		let mut lightmap_uvs: HashMap<u32, SmallVec<[Vec2; 5]>> = HashMap::new();
+		// let mut lightmap_uvs: HashMap<u32, SmallVec<[Vec2; 5]>> = HashMap::new();
 
 		let mut empty_reserved_pixel = ReservedLightmapPixel::new(settings.no_lighting_color);
 		let mut special_reserved_pixel = ReservedLightmapPixel::new(settings.special_lighting_color);
@@ -95,23 +103,11 @@ impl BspData {
 		for (face_idx, face) in self.faces.iter().enumerate() {
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
-			if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
-				lightmap_uvs.insert(
-					face_idx as u32,
-					if tex_info.flags != BspTexFlags::Normal {
-						special_reserved_pixel.get_uvs(&mut packer, face)?
-					} else {
-						empty_reserved_pixel.get_uvs(&mut packer, face)?
-					},
-				);
-				continue;
-			}
-
 			let decoupled_lightmap = decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
 
 			let lm_info = match &decoupled_lightmap {
 				Some(lm_info) => {
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
+					let uvs: SmallVec<[Vec2; 5]> = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
 					let extents = FaceExtents::new_decoupled(uvs.iter().copied(), lm_info);
 
 					LightmapInfo {
@@ -121,7 +117,7 @@ impl BspData {
 					}
 				}
 				None => {
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
+					let uvs: SmallVec<[Vec2; 5]> = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
 					let extents = FaceExtents::new(uvs.iter().copied());
 
 					LightmapInfo {
@@ -132,7 +128,7 @@ impl BspData {
 				}
 			};
 
-			let input = packer.read_from_face(LightmapPackerFaceReaderView {
+			let view = LightmapPackerFaceReadView {
 				lm_info: &lm_info,
 
 				bsp: self,
@@ -141,29 +137,32 @@ impl BspData {
 				face,
 				tex_info,
 				lighting,
-			});
+			};
 
-			let frame = packer.pack(face, input)?;
+			/* if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
+				if tex_info.flags != BspTexFlags::Normal {
+					special_reserved_pixel.get_uvs(&mut packer, view)?
+				} else {
+					empty_reserved_pixel.get_uvs(&mut packer, view)?
+				}
+				continue;
+			} */
 
-			lightmap_uvs.insert(
-				face_idx as u32,
-				lm_info.extents.compute_lightmap_uvs(lm_info.uvs, frame.min.as_vec2()).collect(),
-			);
+			let input = packer.read_from_face(view);
+
+			packer.push(input);
 		}
 
-		let atlas = packer.export();
+		let mut export = packer.export()?;
 
 		// Normalize lightmap UVs from texture space
-		for uvs in lightmap_uvs.values_mut() {
+		for uvs in export.uvs.values_mut() {
 			for uv in uvs {
-				*uv /= atlas.size().as_vec2();
+				*uv /= export.atlas.size().as_vec2();
 			}
 		}
 
-		Ok(LightmapAtlasOutput {
-			uvs: lightmap_uvs,
-			data: atlas,
-		})
+		Ok(export)
 	}
 }
 
@@ -171,7 +170,7 @@ impl BspData {
 #[derive(Debug, Clone)]
 pub struct LightmapInfo {
 	/// The vertices of the face projected onto it's texture or decoupled lightmap.
-	pub uvs: Vec<Vec2>,
+	pub uvs: SmallVec<[Vec2; 5]>,
 	pub extents: FaceExtents,
 	/// The offset into the lightmap lump in bytes to read the lightmap data. Will be x3 for an `.lit` lump.
 	pub lightmap_offset: usize,
@@ -274,11 +273,3 @@ pub struct LightmapsInvalidSizeError {
 	pub image_size: UVec2,
 	pub expected_size: UVec2,
 }
-
-/// Contains a lightmap packers' output, and the UVs into said atlas' for each face.
-pub struct LightmapAtlasOutput<P: LightmapPacker> {
-	/// Map of face indexes to normalized UV coordinates into the atlas.
-	pub uvs: LightmapUvMap,
-	pub data: P::Output,
-}
-
