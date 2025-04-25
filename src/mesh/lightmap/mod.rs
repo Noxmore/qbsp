@@ -53,7 +53,11 @@ impl ReservedLightmapPixel {
 		Self { position: None, color }
 	}
 
-	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, view: LightmapPackerFaceView) -> Result<FaceUvs, ComputeLightmapAtlasError> {
+	pub fn get_uvs<P: LightmapPacker>(
+		&mut self,
+		lightmap_packer: &mut P,
+		view: LightmapPackerFaceView,
+	) -> Result<FaceUvs, ComputeLightmapAtlasError> {
 		let position = match self.position {
 			Some(v) => v,
 			None => {
