@@ -53,7 +53,7 @@ impl ReservedLightmapPixel {
 		Self { position: None, color }
 	}
 
-	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, view: LightmapPackerFaceView) -> Result<SmallVec<[Vec2; 5]>, ComputeLightmapAtlasError> {
+	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, view: LightmapPackerFaceView) -> Result<FaceUvs, ComputeLightmapAtlasError> {
 		let position = match self.position {
 			Some(v) => v,
 			None => {
@@ -87,7 +87,7 @@ impl BspData {
 
 		let settings = packer.settings();
 
-		let mut lightmap_uvs: HashMap<u32, SmallVec<[Vec2; 5]>> = HashMap::new();
+		let mut lightmap_uvs: HashMap<u32, FaceUvs> = HashMap::new();
 
 		let mut empty_reserved_pixel = ReservedLightmapPixel::new(settings.no_lighting_color);
 		let mut special_reserved_pixel = ReservedLightmapPixel::new(settings.special_lighting_color);
@@ -99,7 +99,7 @@ impl BspData {
 
 			let lm_info = match &decoupled_lightmap {
 				Some(lm_info) => {
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
+					let uvs: FaceUvs = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
 					let extents = FaceExtents::new_decoupled(uvs.iter().copied(), lm_info);
 
 					LightmapInfo {
@@ -109,7 +109,7 @@ impl BspData {
 					}
 				}
 				None => {
-					let uvs: Vec<Vec2> = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
+					let uvs: FaceUvs = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
 					let extents = FaceExtents::new(uvs.iter().copied());
 
 					LightmapInfo {
@@ -173,7 +173,7 @@ impl BspData {
 #[derive(Debug, Clone)]
 pub struct LightmapInfo {
 	/// The vertices of the face projected onto it's texture or decoupled lightmap.
-	pub uvs: Vec<Vec2>,
+	pub uvs: FaceUvs,
 	pub extents: FaceExtents,
 	/// The offset into the lightmap lump in bytes to read the lightmap data. Will be x3 for an `.lit` lump.
 	pub lightmap_offset: usize,
@@ -284,3 +284,8 @@ pub struct LightmapAtlasOutput<P: LightmapPacker> {
 	pub data: P::Output,
 }
 
+/// Maps face indexes to normalized UV coordinates into a lightmap atlas.
+pub type LightmapUvMap = HashMap<u32, FaceUvs>;
+
+/// The vast majority of faces have 5 or less vertices, so this is a pretty easy optimization.
+pub type FaceUvs = SmallVec<[Vec2; 5]>;
