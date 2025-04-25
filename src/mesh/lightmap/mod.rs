@@ -53,18 +53,18 @@ impl ReservedLightmapPixel {
 		Self { position: None, color }
 	}
 
-	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, face: &BspFace) -> Result<SmallVec<[Vec2; 5]>, ComputeLightmapAtlasError> {
+	pub fn get_uvs<P: LightmapPacker>(&mut self, lightmap_packer: &mut P, view: LightmapPackerFaceView) -> Result<SmallVec<[Vec2; 5]>, ComputeLightmapAtlasError> {
 		let position = match self.position {
 			Some(v) => v,
 			None => {
 				// TODO: Padding for bicubic filtering
-				let rect = lightmap_packer.pack(face, P::create_single_color_input([1, 1], self.color))?;
+				let rect = lightmap_packer.pack(view, P::create_single_color_input([1, 1], self.color))?;
 				self.position = Some(rect.min);
 				rect.min
 			}
 		};
 
-		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); face.num_edges.0 as usize])
+		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); view.face.num_edges.0 as usize])
 	}
 }
 
@@ -95,18 +95,6 @@ impl BspData {
 		for (face_idx, face) in self.faces.iter().enumerate() {
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
-			if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
-				lightmap_uvs.insert(
-					face_idx as u32,
-					if tex_info.flags != BspTexFlags::Normal {
-						special_reserved_pixel.get_uvs(&mut packer, face)?
-					} else {
-						empty_reserved_pixel.get_uvs(&mut packer, face)?
-					},
-				);
-				continue;
-			}
-
 			let decoupled_lightmap = decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
 
 			let lm_info = match &decoupled_lightmap {
@@ -132,7 +120,7 @@ impl BspData {
 				}
 			};
 
-			let input = packer.read_from_face(LightmapPackerFaceReaderView {
+			let view = LightmapPackerFaceView {
 				lm_info: &lm_info,
 
 				bsp: self,
@@ -141,9 +129,23 @@ impl BspData {
 				face,
 				tex_info,
 				lighting,
-			});
+			};
 
-			let frame = packer.pack(face, input)?;
+			if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
+				lightmap_uvs.insert(
+					face_idx as u32,
+					if tex_info.flags != BspTexFlags::Normal {
+						special_reserved_pixel.get_uvs(&mut packer, view)?
+					} else {
+						empty_reserved_pixel.get_uvs(&mut packer, view)?
+					},
+				);
+				continue;
+			}
+
+			let input = packer.read_from_face(view);
+
+			let frame = packer.pack(view, input)?;
 
 			lightmap_uvs.insert(
 				face_idx as u32,

@@ -9,17 +9,17 @@ pub trait LightmapPacker {
 	type Output: LightmapAtlas;
 
 	fn create_single_color_input(size: impl Into<UVec2>, color: [u8; 3]) -> Self::Input;
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input;
+	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input;
 
 	fn settings(&self) -> ComputeLightmapSettings;
 
-	fn pack(&mut self, face: &BspFace, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError>;
+	fn pack(&mut self, view: LightmapPackerFaceView, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError>;
 	fn export(&self) -> Self::Output;
 }
 
 /// Information provided to read a lightmap from a face.
 #[derive(Clone, Copy)]
-pub struct LightmapPackerFaceReaderView<'a> {
+pub struct LightmapPackerFaceView<'a> {
 	pub lm_info: &'a LightmapInfo,
 
 	pub bsp: &'a BspData,
@@ -92,9 +92,9 @@ impl<LM> DefaultLightmapPacker<LM> {
 		}
 	}
 
-	fn allocate_and_push(&mut self, face: &BspFace, width: u32, height: u32, lm: LM) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
+	fn allocate_and_push(&mut self, view: LightmapPackerFaceView, width: u32, height: u32, lm: LM) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
 		self.packer
-			.pack_own(face.lightmap_offset as u32, DummyTexture { width, height })
+			.pack_own(view.face_idx as u32, DummyTexture { width, height })
 			.map_err(|_| ComputeLightmapAtlasError::PackFailure {
 				lightmap_size: uvec2(width, height),
 				images_packed: self.images.len(),
@@ -103,7 +103,7 @@ impl<LM> DefaultLightmapPacker<LM> {
 
 		Ok(self
 			.packer
-			.get_frame(&(face.lightmap_offset as u32))
+			.get_frame(&(view.face_idx as u32))
 			.map(|frame| {
 				let min = uvec2(frame.frame.x, frame.frame.y);
 				let rect = Rect {
@@ -145,7 +145,7 @@ impl LightmapPacker for PerStyleLightmapPacker {
 		}
 	}
 
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input {
+	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
 		if view.face.lightmap_offset.is_negative() || view.face.lightmap_styles[0] == LightmapStyle::NONE {
 			Self::create_single_color_input(view.lm_info.extents.lightmap_size(), [0; 3])
 		} else {
@@ -171,8 +171,8 @@ impl LightmapPacker for PerStyleLightmapPacker {
 		self.settings
 	}
 
-	fn pack(&mut self, face: &BspFace, lightmaps: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
-		self.allocate_and_push(face, lightmaps.size().x, lightmaps.size().y, lightmaps)
+	fn pack(&mut self, view: LightmapPackerFaceView, lightmaps: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
+		self.allocate_and_push(view, lightmaps.size().x, lightmaps.size().y, lightmaps)
 	}
 
 	fn export(&self) -> Self::Output {
@@ -212,7 +212,7 @@ impl LightmapPacker for PerSlotLightmapPacker {
 		[(); 4].map(|_| (image::RgbImage::from_pixel(size.x, size.y, image::Rgb(color)), LightmapStyle::NORMAL))
 	}
 
-	fn read_from_face(&self, view: LightmapPackerFaceReaderView) -> Self::Input {
+	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
 		let mut i = 0;
 		view.face.lightmap_styles.map(|style| {
 			let image = image::RgbImage::from_fn(view.lm_info.extents.lightmap_size().x, view.lm_info.extents.lightmap_size().y, |x, y| {
@@ -233,14 +233,14 @@ impl LightmapPacker for PerSlotLightmapPacker {
 		self.settings
 	}
 
-	fn pack(&mut self, face: &BspFace, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
+	fn pack(&mut self, view: LightmapPackerFaceView, images: Self::Input) -> Result<Rect<UVec2>, ComputeLightmapAtlasError> {
 		let size = images
 			.iter()
 			.map(|(image, _)| uvec2(image.width(), image.height()))
 			.reduce(UVec2::max)
 			.unwrap();
 
-		self.allocate_and_push(face, size.x, size.y, images)
+		self.allocate_and_push(view, size.x, size.y, images)
 	}
 
 	fn export(&self) -> Self::Output {
