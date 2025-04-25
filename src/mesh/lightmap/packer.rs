@@ -146,7 +146,7 @@ impl LightmapPacker for PerStyleLightmapPacker {
 	}
 
 	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
-		if view.face.lightmap_offset.is_negative() || view.face.lightmap_styles[0] == LightmapStyle::NONE {
+		if view.face.lightmap_styles[0] == LightmapStyle::NONE {
 			Self::create_single_color_input(view.lm_info.extents.lightmap_size(), [0; 3])
 		} else {
 			let mut lightmaps = PerStyleLightmapData::new(view.lm_info.extents.lightmap_size());
