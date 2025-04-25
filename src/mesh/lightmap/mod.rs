@@ -15,6 +15,8 @@ pub struct ComputeLightmapSettings {
 	pub special_lighting_color: [u8; 3],
 	pub max_width: u32,
 	pub max_height: u32,
+	/// Number of pixels to pad around each island, stretches the sides of textures.
+	pub extrusion: u32,
 }
 impl Default for ComputeLightmapSettings {
 	fn default() -> Self {
@@ -24,6 +26,7 @@ impl Default for ComputeLightmapSettings {
 			special_lighting_color: [255; 3],
 			max_width: 2048,
 			max_height: u32::MAX,
+			extrusion: 0,
 		}
 	}
 }
@@ -61,8 +64,8 @@ impl ReservedLightmapPixel {
 		let position = match self.position {
 			Some(v) => v,
 			None => {
-				// TODO: Padding for bicubic filtering
-				let rect = lightmap_packer.pack(view, P::create_single_color_input([1, 1], self.color))?;
+				// TODO: Is this handled by `texture_packer`?
+				let rect = lightmap_packer.pack(view, P::create_single_color_input(UVec2::ONE + lightmap_packer.settings().extrusion * 2, self.color))?;
 				self.position = Some(rect.min);
 				rect.min
 			}
@@ -153,7 +156,7 @@ impl BspData {
 
 			lightmap_uvs.insert(
 				face_idx as u32,
-				lm_info.extents.compute_lightmap_uvs(lm_info.uvs, frame.min.as_vec2()).collect(),
+				lm_info.extents.compute_lightmap_uvs(lm_info.uvs, (frame.min + settings.extrusion).as_vec2()).collect(),
 			);
 		}
 
