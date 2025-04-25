@@ -278,8 +278,3 @@ impl LightmapPacker for PerSlotLightmapPacker {
 
 /// Maps face indexes to normalized UV coordinates into a lightmap atlas. The vast majority of faces have 5 or less vertices.
 pub type LightmapUvMap = HashMap<u32, SmallVec<[Vec2; 5]>>;
-
-pub trait LightmapPackerBackend {}
-
-pub struct SkylinePackerBackend;
-pub struct CrunchPackerBackend;
