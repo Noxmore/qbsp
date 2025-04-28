@@ -65,7 +65,10 @@ impl ReservedLightmapPixel {
 			Some(v) => v,
 			None => {
 				// TODO: Is this handled by `texture_packer`?
-				let rect = lightmap_packer.pack(view, P::create_single_color_input(UVec2::ONE + lightmap_packer.settings().extrusion * 2, self.color))?;
+				let rect = lightmap_packer.pack(
+					view,
+					P::create_single_color_input(UVec2::ONE + lightmap_packer.settings().extrusion * 2, self.color),
+				)?;
 				self.position = Some(rect.min);
 				rect.min
 			}
@@ -112,7 +115,7 @@ impl BspData {
 					LightmapInfo {
 						uvs,
 						extents,
-						lightmap_offset: lm_info.offset as usize,
+						lightmap_offset: lm_info.offset,
 					}
 				}
 				None => {
@@ -122,7 +125,7 @@ impl BspData {
 					LightmapInfo {
 						uvs,
 						extents,
-						lightmap_offset: face.lightmap_offset as usize,
+						lightmap_offset: face.lightmap_offset,
 					}
 				}
 			};
@@ -138,7 +141,7 @@ impl BspData {
 				lighting,
 			};
 
-			if decoupled_lm.is_none() && face.lightmap_offset.is_negative() {
+			if lm_info.lightmap_offset.is_negative() {
 				lightmap_uvs.insert(
 					face_idx as u32,
 					if tex_info.flags != BspTexFlags::Normal {
@@ -150,13 +153,18 @@ impl BspData {
 				continue;
 			}
 
+			assert_ne!(lm_info.extents.lightmap_size(), UVec2::ZERO);
+
 			let input = packer.read_from_face(view);
 
 			let frame = packer.pack(view, input)?;
 
 			lightmap_uvs.insert(
 				face_idx as u32,
-				lm_info.extents.compute_lightmap_uvs(lm_info.uvs, (frame.min + settings.extrusion).as_vec2()).collect(),
+				lm_info
+					.extents
+					.compute_lightmap_uvs(lm_info.uvs, (frame.min + settings.extrusion).as_vec2())
+					.collect(),
 			);
 		}
 
@@ -182,14 +190,16 @@ pub struct LightmapInfo {
 	/// The vertices of the face projected onto it's texture or decoupled lightmap.
 	pub uvs: FaceUvs,
 	pub extents: FaceExtents,
-	/// The offset into the lightmap lump in bytes to read the lightmap data. Will be x3 for an `.lit` lump.
-	pub lightmap_offset: usize,
+	/// The offset into the lightmap lump in bytes to read the lightmap data or -1. Will need to be multiplied by 3 for colored lighting.
+	pub lightmap_offset: i32,
 }
 impl LightmapInfo {
-	/// Computes the index into [`BspLighting`] for the specific face specified.
+	/// Computes the index into [`BspLighting`] for the specific face specified. Assumes [`lightmap_offset`](Self::lightmap_offset) is positive.
 	#[inline]
 	pub fn compute_lighting_index(&self, light_style_idx: usize, x: u32, y: u32) -> usize {
-		self.lightmap_offset + (self.extents.lightmap_pixels() as usize * light_style_idx) + (y * self.extents.lightmap_size().x + x) as usize
+		self.lightmap_offset as usize
+			+ (self.extents.lightmap_pixels() as usize * light_style_idx)
+			+ (y * self.extents.lightmap_size().x + x) as usize
 	}
 }
 

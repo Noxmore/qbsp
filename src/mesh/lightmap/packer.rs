@@ -223,7 +223,10 @@ impl LightmapPacker for PerSlotLightmapPacker {
 					image::Rgb(self.settings.default_color)
 				} else {
 					// let [x, y] = [x.clamp(self.settings.extrusion, width + self.settings.extrusion * 2), y];
-					let [x, y] = [x.saturating_sub(self.settings.extrusion).min(width-1), y.saturating_sub(self.settings.extrusion).min(height-1)];
+					let [x, y] = [
+						x.saturating_sub(self.settings.extrusion).min(width - 1),
+						y.saturating_sub(self.settings.extrusion).min(height - 1),
+					];
 					image::Rgb(view.lighting.get(view.lm_info.compute_lighting_index(i, x, y)).unwrap_or_default())
 				}
 			});
@@ -284,13 +287,14 @@ impl LightmapPacker for PerSlotLightmapPacker {
 #[test]
 fn write_lightmap_atlas() {
 	use std::fs;
-	
+
 	let data = BspData::parse(BspParseInput {
 		bsp: include_bytes!("../../../assets/ad_end.bsp"),
 		lit: Some(include_bytes!("../../../assets/ad_end.lit")),
 		// lit: None,
 		settings: BspParseSettings::default(),
-	}).unwrap();
+	})
+	.unwrap();
 
 	let lightmap_settings = ComputeLightmapSettings {
 		extrusion: 1,
@@ -302,13 +306,20 @@ fn write_lightmap_atlas() {
 	fs::create_dir("target/lightmaps/per-slot").ok();
 	let atlas = data.compute_lightmap_atlas(PerSlotLightmapPacker::new(lightmap_settings)).unwrap();
 	for (slot_idx, slot) in atlas.data.slots.into_iter().enumerate() {
-		slot.save_with_format(format!("target/lightmaps/per-slot/slot_{slot_idx}.png"), image::ImageFormat::Png).unwrap();
+		slot.save_with_format(format!("target/lightmaps/per-slot/slot_{slot_idx}.png"), image::ImageFormat::Png)
+			.unwrap();
 	}
-	atlas.data.styles.save_with_format("target/lightmaps/per-slot/styles.png", image::ImageFormat::Png).unwrap();
+	atlas
+		.data
+		.styles
+		.save_with_format("target/lightmaps/per-slot/styles.png", image::ImageFormat::Png)
+		.unwrap();
 
 	fs::create_dir("target/lightmaps/per-style").ok();
 	let atlas = data.compute_lightmap_atlas(PerStyleLightmapPacker::new(lightmap_settings)).unwrap();
 	for (style, image) in atlas.data.inner {
-		image.save_with_format(format!("target/lightmaps/per-style/{}.png", style.0), image::ImageFormat::Png).unwrap();
+		image
+			.save_with_format(format!("target/lightmaps/per-style/{}.png", style.0), image::ImageFormat::Png)
+			.unwrap();
 	}
 }
