@@ -27,9 +27,9 @@ macro_rules! testing_bsp {
 pub static EXAMPLE_BSP: TestingBsp = testing_bsp!("example.bsp");
 
 pub static TESTING_BSPS: &[TestingBsp] = &[
-	testing_bsp!("ad_crucial.bsp"),
-	testing_bsp!("ad_end.bsp"),
-	testing_bsp!("ad_tears.bsp"),
+	testing_bsp!("ad_crucial.bsp", "ad_crucial.lit"),
+	testing_bsp!("ad_end.bsp", "ad_end.lit"),
+	testing_bsp!("ad_tears.bsp", "ad_tears.lit"),
 	EXAMPLE_BSP,
 ];
 
