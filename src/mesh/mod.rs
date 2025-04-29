@@ -154,7 +154,7 @@ impl FaceExtents {
 			extents.face_rect = extents.face_rect.union_point(uv);
 		}
 
-		extents.lightmap_size = U16Vec2::from_array(lm_info.size).as_uvec2();
+		extents.lightmap_size = lm_info.size.as_uvec2();
 
 		extents.lightmap_pixels = extents.lightmap_size.element_product();
 

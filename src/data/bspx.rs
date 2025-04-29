@@ -310,8 +310,7 @@ pub type DecoupledLightmaps = Vec<DecoupledLightmap>;
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DecoupledLightmap {
-	// TODO tmp fix until bevy_reflect 0.16, where i can make this U16Vec3 again
-	pub size: [u16; 2],
+	pub size: U16Vec2,
 	/// Offset into the lighting lump, or -1
 	pub offset: i32,
 
