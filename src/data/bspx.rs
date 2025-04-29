@@ -109,18 +109,18 @@ impl BspxData {
 
 	/// Parses the `DECOUPLED_LM` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
 	pub fn parse_decoupled_lm(&self, ctx: &BspParseContext) -> Option<BspResult<DecoupledLightmaps>> {
-		let mut reader = BspByteReader::new(self.get("DECOUPLED_LM")?, ctx);
-		let mut lm_infos = DecoupledLightmaps::new();
+		let lump_data = self.get("DECOUPLED_LM")?;
+		let mut reader = BspByteReader::new(lump_data, ctx);
+		let entries_count = lump_data.len() / DecoupledLightmap::bsp_struct_size(ctx);
+		let mut lm_infos = DecoupledLightmaps::with_capacity(entries_count);
 
-		let mut i: usize = 0;
-		while reader.in_bounds() {
+		for i in 0..entries_count {
 			let lm_info = match reader.read().job(format!("Parsing DECOUPLED_LM BSPX lump element {i}")) {
 				Ok(v) => v,
 				Err(err) => return Some(Err(err)),
 			};
 
 			lm_infos.push(lm_info);
-			i += 1;
 		}
 
 		Some(Ok(lm_infos))
@@ -311,7 +311,8 @@ pub type DecoupledLightmaps = Vec<DecoupledLightmap>;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DecoupledLightmap {
 	pub size: U16Vec2,
-	pub offset: u32,
+	/// Offset into the lighting lump, or -1
+	pub offset: i32,
 
 	pub projection: PlanarTextureProjection,
 }

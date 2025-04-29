@@ -14,6 +14,6 @@ pub use crate::{BspData, BspParseError, BspParseInput, BspParseSettings, QUAKE_P
 
 #[cfg(feature = "meshing")]
 pub use crate::mesh::{
-	lighting::{ComputeLightmapSettings, LightmapAtlasData, LightmapAtlasType, LightmapUvMap},
+	lightmap::{ComputeLightmapSettings, LightmapUvMap, PerSlotLightmapPacker, PerStyleLightmapPacker},
 	ExportedMesh,
 };

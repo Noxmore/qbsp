@@ -1,6 +1,6 @@
 //! Turning [`BspData`] into a renderable mesh.
 
-pub mod lighting;
+pub mod lightmap;
 
 use crate::*;
 
@@ -104,12 +104,6 @@ impl BspData {
 
 		MeshModelOutput { meshes }
 	}
-}
-
-/// Computes the index into [`BspLighting`] for the specific face specified.
-#[inline]
-pub fn compute_lighting_index(lightmap_offset: usize, extents: &FaceExtents, light_style_idx: usize, x: u32, y: u32) -> usize {
-	lightmap_offset + (extents.lightmap_pixels() as usize * light_style_idx) + (y * extents.lightmap_size().x + x) as usize
 }
 
 /// Computed extents of a face for various calculations, mainly involving lightmaps.
