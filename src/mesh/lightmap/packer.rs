@@ -216,17 +216,12 @@ impl LightmapPacker for PerSlotLightmapPacker {
 	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
 		let mut i = 0;
 		view.face.lightmap_styles.map(|style| {
-			let UVec2 { x: width, y: height } = view.lm_info.extents.lightmap_size() + self.settings.extrusion * 2;
+			let UVec2 { x: width, y: height } = view.lm_info.extents.lightmap_size();
 
 			let image = image::RgbImage::from_fn(width, height, |x, y| {
 				if style == LightmapStyle::NONE {
 					image::Rgb(self.settings.default_color)
 				} else {
-					// let [x, y] = [x.clamp(self.settings.extrusion, width + self.settings.extrusion * 2), y];
-					let [x, y] = [
-						x.saturating_sub(self.settings.extrusion).min(width - 1),
-						y.saturating_sub(self.settings.extrusion).min(height - 1),
-					];
 					image::Rgb(view.lighting.get(view.lm_info.compute_lighting_index(i, x, y)).unwrap_or_default())
 				}
 			});
@@ -267,11 +262,20 @@ impl LightmapPacker for PerSlotLightmapPacker {
 				let dst_image =
 					slots[slot_idx].get_or_insert_with(|| image::RgbImage::from_pixel(size.x, size.y, image::Rgb(self.settings.default_color)));
 
-				for x in 0..frame_width {
-					for y in 0..frame_height {
-						styles.get_pixel_mut(frame.min.x + x, frame.min.y + y).0[slot_idx] = style.0;
+				for x in 0..frame_width + self.settings.extrusion * 2 {
+					let global_x = frame.min.x + x;
+					if global_x >= size.x { continue }
+					
+					for y in 0..frame_height + self.settings.extrusion * 2 {
+						let global_y = frame.min.y + y;
+						if global_y >= size.y { continue }
+						
+						styles.get_pixel_mut(global_x, global_y).0[slot_idx] = style.0;
 
-						dst_image.put_pixel(frame.min.x + x, frame.min.y + y, *slot_image.get_pixel(x, y));
+						dst_image.put_pixel(global_x, global_y, *slot_image.get_pixel(
+							x.saturating_sub(self.settings.extrusion).min(frame_width - 1),
+							y.saturating_sub(self.settings.extrusion).min(frame_height - 1),
+						));
 					}
 				}
 			}
