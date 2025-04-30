@@ -177,7 +177,9 @@ impl LightmapPacker for PerStyleLightmapPacker {
 	}
 
 	fn export(&self) -> Self::Output {
-		let mut atlas = PerStyleLightmapData::new(self.total_size());
+		let size = self.total_size();
+
+		let mut atlas = PerStyleLightmapData::new(size);
 		let [atlas_width, atlas_height] = atlas.size().to_array();
 
 		for (frame, lightmap_images) in &self.images {
@@ -190,9 +192,26 @@ impl LightmapPacker for PerStyleLightmapPacker {
 							.entry(*light_style)
 							.or_insert_with(|| image::RgbImage::from_pixel(atlas_width, atlas_height, image::Rgb(self.settings.default_color)));
 
-						for x in 0..frame_width {
-							for y in 0..frame_height {
-								dst_image.put_pixel(frame.min.x + x, frame.min.y + y, *lightmap_image.get_pixel(x, y));
+						for x in 0..frame_width + self.settings.extrusion * 2 {
+							let global_x = frame.min.x + x;
+							if global_x >= size.x {
+								continue;
+							}
+
+							for y in 0..frame_height + self.settings.extrusion * 2 {
+								let global_y = frame.min.y + y;
+								if global_y >= size.y {
+									continue;
+								}
+
+								dst_image.put_pixel(
+									global_x,
+									global_y,
+									*lightmap_image.get_pixel(
+										x.saturating_sub(self.settings.extrusion).min(frame_width - 1),
+										y.saturating_sub(self.settings.extrusion).min(frame_height - 1),
+									),
+								);
 							}
 						}
 					})
