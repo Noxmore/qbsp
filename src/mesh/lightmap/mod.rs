@@ -141,7 +141,7 @@ impl BspData {
 				lighting,
 			};
 
-			if lm_info.lightmap_offset.is_negative() {
+			if lm_info.lightmap_offset.is_negative() || lm_info.extents.lightmap_size() == UVec2::ZERO {
 				lightmap_uvs.insert(
 					face_idx as u32,
 					if tex_info.flags != BspTexFlags::Normal {
@@ -152,8 +152,6 @@ impl BspData {
 				);
 				continue;
 			}
-
-			assert_ne!(lm_info.extents.lightmap_size(), UVec2::ZERO);
 
 			let input = packer.read_from_face(view);
 
