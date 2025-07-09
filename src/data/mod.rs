@@ -255,7 +255,11 @@ impl<const N: usize> BspValue for FixedStr<N> {
 	}
 }
 impl<const N: usize> FixedStr<N> {
-	pub fn new(data: [u8; N]) -> Result<Self, std::str::Utf8Error> {
+	pub fn new(mut data: [u8; N]) -> Result<Self, std::str::Utf8Error> {
+		// Clear any garbage after the '\0' terminator.
+		if let Some(index) = data.iter().position(|b| *b == 0) {
+			data[index..].fill(0);
+		}
 		std::str::from_utf8(&data)?;
 		Ok(Self { data })
 	}
@@ -454,4 +458,9 @@ impl BspValue for LumpDirectory {
 fn fixed_str_from_str() {
 	assert!(FixedStr::<8>::from_str("12345678").is_ok());
 	assert!(FixedStr::<8>::from_str("123456789").is_err());
+}
+
+#[test]
+fn fixed_str_from_null_garbage() {
+	assert!(FixedStr::<8>::new([b'+', b's', b'k', b'y', 0, b'+', b'v', 189]).is_ok());
 }
