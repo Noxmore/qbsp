@@ -27,7 +27,7 @@ license.workspace = true
 [dependencies]
 qbsp_macros = { version = "0.5.1", path = "qbsp_macros" }
 
-glam = "0.29"
+glam = "0.*"
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 strum = { version = "0.27", features = ["derive"] }
