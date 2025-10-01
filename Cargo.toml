@@ -2,7 +2,7 @@
 members = ["qbsp_macros", "tools/*"]
 
 [workspace.package]
-version = "0.5.1"
+version = "0.6.0"
 description = "Rust crate for parsing and operating with Quake 1 BSP files"
 edition = "2021"
 authors = ["Noxmore"]
@@ -25,9 +25,9 @@ license.workspace = true
 
 
 [dependencies]
-qbsp_macros = { version = "0.5.1", path = "qbsp_macros" }
+qbsp_macros = { version = "0.6.0", path = "qbsp_macros" }
 
-glam = "0.29"
+glam = "0.*"
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 strum = { version = "0.27", features = ["derive"] }
@@ -38,7 +38,7 @@ derive_more = { version = "2", features = [
 	"deref_mut",
 	"into_iterator",
 ] }
-bevy_reflect = { version = "0.16", features = ["glam"], optional = true }
+bevy_reflect = { version = "0.17", package = "bevy_reflect", features = ["glam"], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
 
 [features]

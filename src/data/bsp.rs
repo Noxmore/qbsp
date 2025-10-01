@@ -433,7 +433,7 @@ impl BspLighting {
 			let _version: i32 = reader.read()?;
 		}
 
-		if data[reader.pos..].len() % 3 != 0 {
+		if !data[reader.pos..].len().is_multiple_of(3) {
 			return Err(BspParseError::ColorDataSizeNotDevisableBy3(data[reader.pos..].len()));
 		}
 
