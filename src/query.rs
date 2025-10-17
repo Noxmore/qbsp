@@ -43,6 +43,38 @@ impl BspData {
 		}
 	}
 
+	/// Get the visible leaf indices of the leaf with index `leaf_idx`.
+	///
+	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
+	/// area. In this case, most BSP implementations consider all leaves visible.
+	pub fn visible_leaf_indices_of_leaf(&self, leaf_idx: usize) -> Option<impl Iterator<Item = usize> + '_> {
+		let vis_offset = self.leaves.get(leaf_idx)?.vis_list;
+		// Return `None` if vis_offset is `-1`.
+		let vis_offset: usize = vis_offset.try_into().ok()?;
+
+		Some(util::potentially_visible_leaf_indices(
+			self.visibility.get(vis_offset..)?,
+			self.leaves.len(),
+		))
+	}
+
+	/// Get the visible leaf indices at the point `point` in the model at the index `model_idx`.
+	///
+	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
+	/// area. In this case, most BSP implementations consider all leaves visible.
+	pub fn visible_leaf_indices_at_point(&self, model_idx: usize, point: Vec3) -> Option<impl Iterator<Item = usize> + '_> {
+		self.visible_leaf_indices_of_leaf(self.leaf_at_point(model_idx, point))
+	}
+
+	/// Get the visible leaves at the point `point` in the model at the index `model_idx`.
+	///
+	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
+	/// area. In this case, most BSP implementations consider all leaves visible.
+	pub fn visible_leaves_at(&self, model_idx: usize, point: Vec3) -> Option<impl Iterator<Item = &BspLeaf> + '_> {
+		self.visible_leaf_indices_of_leaf(self.leaf_at_point(model_idx, point))
+			.map(|leaf_idxs| leaf_idxs.filter_map(|idx| self.leaves.get(idx)))
+	}
+
 	/// Implementation of Quake's `SV_RecursiveHullCheck` function.
 	/// Traces a line through this data's model at `model_idx`, returning information of the leaf it ends up at, and the first surface it hits if any.
 	///
