@@ -139,6 +139,8 @@ pub struct BspParseContext {
 /// An Id Tech 1 palette to use for embedded images.
 #[repr(C)] // Because we transmute data with QUAKE_PALETTE, don't want Rust to pull any shenanigans
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Palette {
 	pub colors: [[u8; 3]; 256],
 }
