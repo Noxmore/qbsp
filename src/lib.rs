@@ -142,6 +142,7 @@ pub struct BspParseContext {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Palette {
+	#[cfg_attr(feature = "serde", serde(with = "serde_big_array::BigArray"))]
 	pub colors: [[u8; 3]; 256],
 }
 impl Default for Palette {
