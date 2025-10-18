@@ -256,7 +256,7 @@ impl BspData {
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
 			textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
-			visibility: lump_dir.vertices.get(bsp)?.to_vec(),
+			visibility: lump_dir.visibility.get(bsp)?.to_vec(),
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
