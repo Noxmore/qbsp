@@ -1,7 +1,11 @@
 //! BSP file data parsing.
 
-pub mod bsp;
+pub mod bsp3x;
 pub mod bspx;
+pub mod idtech2;
+pub mod q1bsp;
+
+pub use q1bsp as bsp;
 
 use std::{
 	marker::PhantomData,
@@ -9,7 +13,38 @@ use std::{
 	str::FromStr,
 };
 
-use crate::*;
+use crate::{bsp3x::BspTexExtraInfo, idtech2::BspNodeRef, *};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct NoField;
+
+impl BspValue for NoField {
+	fn bsp_parse(_reader: &mut BspByteReader) -> BspResult<Self> {
+		Ok(NoField)
+	}
+
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		0
+	}
+}
+
+/// Workaround for `impl From<T> for Option<T>` being in the stdlib
+macro_rules! impl_from_no_field_for_option {
+	($opt_inner:ty) => {
+		impl From<NoField> for Option<$opt_inner> {
+			fn from(_: NoField) -> Self {
+				None
+			}
+		}
+	};
+}
+
+impl_from_no_field_for_option!(u32);
+impl_from_no_field_for_option!(BspTexExtraInfo);
+impl_from_no_field_for_option!(BspAmbience);
+impl_from_no_field_for_option!(BspLeafBrushes);
 
 /// Like a [`Cursor`](std::io::Cursor), but i don't have to constantly juggle buffers.
 pub struct BspByteReader<'a> {
@@ -133,22 +168,36 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 	}
 }
 
-/// A value in a BSP file where its size differs between formats.
+/// A value in a BSP file where its size differs between formats. `Generic` represents the
+/// value that can represent all of the format-specific types.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, #[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<BSP29>);
-impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
-	pub fn new(value: BSP2) -> Self {
+pub struct BspVariableValue<Generic, BSP29, BSP2 = Generic, BSP38 = BSP2, BSP30 = BSP38>(
+	pub Generic,
+	#[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<(BSP29, BSP2, BSP38, BSP30)>,
+);
+
+impl<Generic, BSP2, BSP29, BSP38, BSP30> BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
+	pub fn new(value: Generic) -> Self {
 		Self(value, PhantomData)
 	}
 }
-impl<BSP2: BspValue, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue<BSP2, BSP29> {
+
+impl<Generic, BSP2, BSP29, BSP38, BSP30> BspValue for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30>
+where
+	BSP2: BspValue + Into<Generic>,
+	BSP29: BspValue + Into<Generic>,
+	BSP38: BspValue + Into<Generic>,
+	BSP30: BspValue + Into<Generic>,
+{
 	#[inline]
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
-			BspFormat::BSP2 => reader.read().map(Self::new),
+			BspFormat::BSP2 => Ok(Self::new(BSP2::bsp_parse(reader)?.into())),
 			BspFormat::BSP29 => Ok(Self::new(BSP29::bsp_parse(reader)?.into())),
+			BspFormat::BSP38 => Ok(Self::new(BSP38::bsp_parse(reader)?.into())),
+			BspFormat::BSP30 => Ok(Self::new(BSP30::bsp_parse(reader)?.into())),
 		}
 	}
 	#[inline]
@@ -156,6 +205,8 @@ impl<BSP2: BspValue, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue
 		match ctx.format {
 			BspFormat::BSP2 => BSP2::bsp_struct_size(ctx),
 			BspFormat::BSP29 => BSP29::bsp_struct_size(ctx),
+			BspFormat::BSP38 => BSP38::bsp_struct_size(ctx),
+			BspFormat::BSP30 => BSP30::bsp_struct_size(ctx),
 		}
 	}
 }
@@ -170,21 +221,25 @@ impl<BSP2, BSP29> DerefMut for BspVariableValue<BSP2, BSP29> {
 		&mut self.0
 	}
 }
-impl<BSP2: std::fmt::Debug, BSP29: std::fmt::Debug> std::fmt::Debug for BspVariableValue<BSP2, BSP29> {
+impl<Generic: std::fmt::Debug, BSP29, BSP2, BSP38, BSP30> std::fmt::Debug for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.0.fmt(f)
 	}
 }
-impl<BSP2: std::fmt::Display, BSP29: std::fmt::Display> std::fmt::Display for BspVariableValue<BSP2, BSP29> {
+impl<Generic: std::fmt::Display, BSP29, BSP2, BSP38, BSP30> std::fmt::Display for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.0.fmt(f)
 	}
 }
 
 /// An unsigned variable integer parsed from a BSP. u32 when parsing BSP2, u16 when parsing BSP29.
-pub type UBspValue = BspVariableValue<u32, u16>;
+///
+/// In almost all cases, BSP38 and BSP30 do not have increasd limits, and so they still use 16-bit indices.
+pub type UBspValue = BspVariableValue<u32, u16, u32, u16, u16>;
 /// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
-pub type IBspValue = BspVariableValue<i32, i16>;
+///
+/// In almost all cases, BSP38 and BSP30 do not have increasd limits, and so they still use 16-bit indices.
+pub type IBspValue = BspVariableValue<i32, i16, i32, i16, i16>;
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -351,6 +406,46 @@ impl From<ShortBoundingBox> for BoundingBox {
 
 /// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
 pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
+
+#[derive(Clone, PartialEq, Debug, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+struct RootHulls<const COUNT: usize>([BspNodeRef; COUNT]);
+
+impl From<RootHulls<1>> for RootHulls<4> {
+	fn from(value: RootHulls<1>) -> Self {
+		let mut out = [BspNodeRef::Leaf(0); 4];
+
+		for (src, dst) in value.0.into_iter().zip(&mut out) {
+			*dst = src;
+		}
+
+		RootHulls(out)
+	}
+}
+
+impl<const COUNT: usize> BspValue for RootHulls<COUNT> {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		Ok(Self(<[_; COUNT]>::bsp_parse(reader)?))
+	}
+
+	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+		<[i32; COUNT]>::bsp_struct_size(ctx)
+	}
+}
+
+/// Annoyingly, Quake 2 is the only format that has a differing number of root hulls. This is because
+/// it handles collision differently to all other IDTech2-based engines.
+///
+/// Note that in the Quake 1 engine, only the first 3 hulls are used. As this is a restriction of the
+/// engine, not Quake 1's QuakeC game code, this means that BSP29 will have only 3 valid hulls in
+/// almost all cases.
+///
+/// [The specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BLE) notes
+/// that the 4th hull is "usually zero" in Quake 1.
+/// [The Valve Developer Wiki](https://developer.valvesoftware.com/wiki/BSP_(GoldSrc)) says "hull
+/// 3 is unused in Quake" (meaning the 4th hull, as the 1st hull is hull 0).
+pub type VariableRootHulls = BspVariableValue<RootHulls<4>, RootHulls<4>, RootHulls<4>, RootHulls<1>, RootHulls<4>>;
 
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]

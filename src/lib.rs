@@ -4,7 +4,7 @@ pub mod prelude;
 pub(crate) use prelude::*;
 
 pub mod data;
-pub(crate) use data::{bsp::*, bspx::*, *};
+pub(crate) use data::{bspx::*, q1bsp::*, *};
 
 #[cfg(feature = "meshing")]
 pub mod mesh;
@@ -113,14 +113,24 @@ pub enum BspFormat {
 	/// Modern BSP format with expanded limits
 	#[default]
 	BSP2,
+
 	/// Original quake format, in most cases, you should use BSP2 over this.
 	BSP29,
+
+	/// Quake 2 format. For the sake of `BspVariableValue`, this is usually the same as `BSP2`.
+	BSP38,
+
+	/// Goldsrc format. For the sake of `BspVariableValue`, this is usually the same as `BSP2`,
+	/// but differs in some cases (e.g. each model having up to 4 hulls).
+	BSP30,
 }
 impl BspFormat {
 	pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
 		match &data {
 			b"BSP2" => Ok(Self::BSP2),
 			[0x1D, 0x00, 0x00, 0x00] => Ok(Self::BSP29),
+			[0x1E, 0x00, 0x00, 0x00] => Ok(Self::BSP30),
+			[0x26, 0x00, 0x00, 0x00] => Ok(Self::BSP38),
 			_ => Err(BspParseError::WrongMagicNumber {
 				found: data,
 				expected: "BSP2 or 0x1D for BSP29",
@@ -134,6 +144,9 @@ impl BspFormat {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspParseContext {
 	pub format: BspFormat,
+	/// If the texture data is stored separately (only for BSP30 - Goldsrc), this is the parsed
+	/// miptex data.
+	pub miptexes: Option<Vec<BspMipTexture>>,
 }
 
 /// An Id Tech 1 palette to use for embedded images.
@@ -219,6 +232,21 @@ pub struct BspData {
 	/// Additional information from the BSP parsed. For example, contains the [BspFormat] of the file.
 	pub parse_ctx: BspParseContext,
 }
+
+/// Offsets for each 
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct BspVisDataOffsets {
+	/// Index into `visibility` where the potentially visible set starts.
+	pub pvs: u32,
+	/// Index into `visibility` where the potentially audible set starts.
+	pub phs: Option<u32>,
+}
+
+pub struct BspVisData {
+	pub cluster_offsets: <BspVisDataOffsets>,
+	pub visibility: Vec<u8>,
+}
+
 impl BspData {
 	/// Parses the data from BSP input.
 	pub fn parse(input: BspParseInput) -> BspResult<Self> {
@@ -258,7 +286,7 @@ impl BspData {
 				.job("Reading entities lump")?
 				.to_string(),
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
-			textures: read_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
+			textures: read_mip_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
 			visibility: lump_dir.vertices.get(bsp)?.to_vec(),
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
