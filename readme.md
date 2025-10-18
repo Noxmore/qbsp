@@ -27,5 +27,4 @@ let _ = BspData::parse(BspParseInput {
 # Feature wishlist
 I might work on these at a later date, but if anyone wants to help out or just give some ideas, they're more than welcome to!
 - More flexible meshing API
-- PVS data support
 - BSP writing
