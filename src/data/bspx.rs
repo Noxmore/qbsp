@@ -1,7 +1,7 @@
 //! [BSPX](https://developer.valvesoftware.com/wiki/BSPX) data definitions.
 
 use super::*;
-use crate::*;
+use crate::{idtech2::LightmapStyle, *};
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 

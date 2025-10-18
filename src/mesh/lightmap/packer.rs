@@ -1,5 +1,6 @@
 use super::*;
 use crate::*;
+use idtech2::LightmapStyle;
 
 use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
 

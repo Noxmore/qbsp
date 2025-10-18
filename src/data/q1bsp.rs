@@ -1,104 +1,86 @@
 //! BSP data definitions.
 
 use super::*;
-use crate::*;
+use crate::{
+	bsp3x::{BspSurfaceFlags, BspTexExtraInfo},
+	idtech2::BspNodeRef,
+	*,
+};
 
-#[derive(BspValue, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspEdge {
-	/// The index to the first vertex this edge connects
-	pub a: UBspValue,
-	/// The index to the second vertex this edge connects
-	pub b: UBspValue,
-}
+use enumflags2::BitFlags;
+pub use idtech2::{BspEdge, BspFace};
 
-/// Byte that dictates how a specific BSP lightmap appears:
-/// - 255 means there is no lightmap.
-/// - 0 means normal, unanimated lightmap.
-/// - 1 through 254 are programmer-defined animated styles, including togglable lights. In Quake though, 1 produces a fast pulsating light, and 2 produces a slow pulsating light, so those might be good defaults.
-///
-/// It is recommended to compare these values via the provided methods and constants of this type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LightmapStyle(pub u8);
-impl LightmapStyle {
-	/// Unanimated lightmap.
-	pub const NORMAL: Self = Self(0);
-	/// No lightmap.
-	pub const NONE: Self = Self(u8::MAX);
-}
-impl BspValue for LightmapStyle {
-	#[inline]
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		reader.read().map(Self)
-	}
-	#[inline]
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		1
-	}
-}
-impl std::fmt::Display for LightmapStyle {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self.0 {
-			0 => write!(f, "0 (normal)"),
-			255 => write!(f, "255 (no lightmap)"),
-			n => n.fmt(f),
-		}
-	}
-}
-
-#[derive(BspValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspFace {
-	/// Index of the plane the face is parallel to
-	pub plane_idx: UBspValue,
-	/// If not zero, seems to indicate that the normal should be inverted when creating meshes
-	pub plane_side: UBspValue,
-
-	/// Index of the first edge (in the face edge array)
-	pub first_edge: u32,
-	/// Number of consecutive edges (in the face edge array)
-	pub num_edges: UBspValue,
-
-	/// Index of the texture info structure
-	pub texture_info_idx: UBspValue,
-
-	/// Each face can have up to 4 lightmaps, the additional 3 are positioned right after the lightmap at `lightmap_offset`.
-	///
-	/// Each element in this array is the style in which these lightmaps appear, see docs for [`LightmapStyle`].
-	///
-	/// You can also short-circuit when looping through these styles, if `lightmap_styles[2]` is 255, there isn't a possibility that `lightmap_styles[3]` isn't.
-	pub lightmap_styles: [LightmapStyle; 4],
-
-	/// Offset of the lightmap (in bytes) in the lightmap lump, or -1 if no lightmap
-	pub lightmap_offset: i32,
-}
-
-impl BspFace {
-	/// Returns an iterator that retrieves the vertex positions that make up this face from `bsp`.
-	#[inline]
-	pub fn vertices<'a>(&self, bsp: &'a BspData) -> impl Iterator<Item = Vec3> + 'a {
-		(self.first_edge..self.first_edge + self.num_edges.0).map(|i| {
-			let surf_edge = bsp.surface_edges[i as usize];
-			let edge = bsp.edges[surf_edge.unsigned_abs() as usize];
-			let vert_idx = if surf_edge.is_negative() { (edge.b, edge.a) } else { (edge.a, edge.b) };
-
-			bsp.vertices[*vert_idx.0 as usize]
-		})
-	}
-}
-
-#[derive(BspValue, Debug, Clone, Copy)]
+#[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfo {
 	pub projection: PlanarTextureProjection,
 
-	pub texture_idx: u32,
-	pub flags: BspTexFlags,
+	pub texture_idx: BspVariableValue<Option<u32>, u32, u32, NoField, u32>,
+
+	/// Goldsrc and Q2 have surface flags, Q1 and BSP2 have texture flags.
+	pub flags: BspVariableValue<BspTexInfoFlags, BspTexFlags, BspTexFlags, BitFlags<BspSurfaceFlags>>,
+
+	/// Extra info stored directly on the `TexInfo` - for Quake 2 (which does not have a lump for embedded textures).
+	pub extra_info: BspVariableValue<Option<BspTexExtraInfo>, NoField, NoField, BspTexExtraInfo, NoField>,
+}
+
+impl BspTexExtraInfo {
+	pub const UNIT_TEXTURE_BRIGHTNESS: u32 = 255;
+
+	/// The brightness of the texture - if in the range 0..1 this material is diffuse, if it's
+	/// more than 1 then this texture is emissive. By far the most-common brightness is 1, and
+	/// most maps will display reasonably if clamping this value in the 0..1 range and making
+	/// all textures diffuse. If doing HDR rendering, the material should have a diffuse
+	/// layer at normal brightness plus an emissive layer with the same texture, with emission
+	/// set to `1. - brightness`.
+	pub fn brightness(&self) -> f64 {
+		self.value as f64 / Self::UNIT_TEXTURE_BRIGHTNESS as f64
+	}
+
+	/// The scale to apply to the diffuse layer (always in the range 0..1).
+	pub fn diffuse_scale(&self) -> f64 {
+		self.brightness().min(1.)
+	}
+
+	/// If this texture has an emissive component (brightness > 1), this is the emissive scale
+	/// for that texture. If this method returns `Some(scale)`, then `scale` will always be
+	/// greater than 0.
+	pub fn emissive_scale(&self) -> Option<f64> {
+		self.value
+			// Subtract `UNIT_TEXTURE_BRIGHTNESS + 1` so we return `None` if this is zero...
+			.checked_sub(Self::UNIT_TEXTURE_BRIGHTNESS + 1)
+			// ...then add 1 back to get the actual scale.
+			.map(|brightness| (brightness + 1) as f64 / Self::UNIT_TEXTURE_BRIGHTNESS as f64)
+	}
+}
+
+impl From<BspTexFlags> for BspTexInfoFlags {
+	fn from(value: BspTexFlags) -> Self {
+		Self {
+			texture_flags: Some(value),
+			surface_flags: Default::default(),
+		}
+	}
+}
+
+impl From<BitFlags<BspSurfaceFlags>> for BspTexInfoFlags {
+	fn from(value: BitFlags<BspSurfaceFlags>) -> Self {
+		Self {
+			texture_flags: None,
+			surface_flags: value,
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspTexInfoFlags {
+	/// If this is `None`, then the name should be used to check the texture flags (for Goldsrc and Quake 2)
+	texture_flags: Option<BspTexFlags>,
+	/// For BSP2 and BSP29, this is always zero.
+	surface_flags: BitFlags<BspSurfaceFlags>,
 }
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -123,16 +105,13 @@ pub struct BspModel {
 	/// Origin of model, usually (0,0,0)
 	pub origin: Vec3,
 
-	pub head_bsp_node: BspNodeRef,
-	/// If positive, index of first clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
-	pub first_clip_node: i32,
-	/// If positive, index of second clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
-	pub second_clip_node: i32,
-	/// [The specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BLE) notes this as "usually zero".
-	pub node_id3: i32,
+	/// If positive, index of clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
+	pub root_hulls: VariableRootHulls,
 
-	/// Number of visleafs not including the solid leaf 0
-	pub visleafs: u32,
+	/// Number of visleafs, not including the out-of-bounds leaf 0. Quake uses a cluster system for visibility,
+	/// and so this field is not included.
+	pub visleafs: BspVariableValue<Option<u32>, u32, u32, NoField, u32>,
+
 	pub first_face: u32,
 	pub num_faces: u32,
 }
@@ -183,7 +162,12 @@ pub enum BspPlaneType {
 }
 
 /// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
-pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspTexture>>> {
+pub fn read_mip_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspMipTexture>>> {
+	// Quake 2 doesn't have this lump at all.
+	if reader.ctx.format == BspFormat::BSP38 {
+		return Ok(vec![]);
+	}
+
 	let mut textures = Vec::new();
 	let num_mip_textures: u32 = reader.read()?;
 
@@ -193,7 +177,7 @@ pub fn read_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<Bsp
 			textures.push(None);
 			continue;
 		}
-		textures.push(Some(BspTexture::bsp_parse(&mut reader.with_pos(offset as usize))?));
+		textures.push(Some(BspMipTexture::bsp_parse(&mut reader.with_pos(offset as usize))?));
 	}
 
 	Ok(textures)
@@ -215,32 +199,6 @@ pub struct BspNode {
 	pub face_idx: UBspValue,
 	/// Number of faces this node contains.
 	pub face_num: UBspValue,
-}
-
-/// A reference to a [`BspNode`]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum BspNodeRef {
-	Node(u32),
-	Leaf(u32),
-}
-impl BspNodeRef {
-	pub fn from_i32(value: i32) -> Self {
-		if value.is_negative() {
-			Self::Leaf((-value) as u32 - 1) // - 1 because you can't have -0
-		} else {
-			Self::Node(value as u32)
-		}
-	}
-}
-impl BspValue for BspNodeRef {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		Ok(Self::from_i32(reader.read()?))
-	}
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		size_of::<i32>()
-	}
 }
 
 /// Wrapper over [`BspNodeRef`] that reads a [`IBspValue`] instead of an `i32`.
@@ -318,13 +276,35 @@ impl BspValue for ShortBspLeafContents {
 	}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum VisdataRef {
+	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
+	Cluster(i16),
+	/// Most IDTech2 formats store visdata on a per-leaf basis.
+	VisLeaves(i32),
+}
+
+impl From<i16> for VisdataRef {
+	fn from(value: i16) -> Self {
+		Self::Cluster(value)
+	}
+}
+
+impl From<i32> for VisdataRef {
+	fn from(value: i32) -> Self {
+		Self::VisLeaves(value)
+	}
+}
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspLeaf {
 	pub contents: BspLeafContents,
 	/// Beginning of visibility lists, or `-1`.
-	pub vis_list: i32,
+	pub vis_list: BspVariableValue<VisdataRef, i32, i32, i16, i32>,
 
 	pub bound: VariableBoundingBox,
 
@@ -333,23 +313,59 @@ pub struct BspLeaf {
 	/// Number of elements in the `mark_surfaces` list.
 	pub face_num: UBspValue,
 
-	pub ambience_water: u8,
-	pub ambience_sky: u8,
-	pub ambience_slime: u8,
-	pub ambience_lava: u8,
+	pub ambience: BspVariableValue<Option<BspAmbience>, BspAmbience, BspAmbience, NoField, BspAmbience>,
+	pub leaf_brushes: BspVariableValue<Option<BspLeafBrushes>, NoField, NoField, BspLeafBrushes, NoField>,
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspLeafBrushes {
+	pub idx: u16,
+	pub num: u16,
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspAmbience {
+	pub water: u8,
+	pub sky: u8,
+	pub slime: u8,
+	pub lava: u8,
 }
 
 #[derive(Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspTexture {
-	pub header: BspTextureHeader,
-	pub data: Option<Vec<u8>>,
-	pub data_half: Option<Vec<u8>>,
-	pub data_quarter: Option<Vec<u8>>,
-	pub data_eighth: Option<Vec<u8>>,
+pub struct BspTextureData {
+	pub full: Option<Vec<u8>>,
+	pub half: Option<Vec<u8>>,
+	pub quarter: Option<Vec<u8>>,
+	pub eighth: Option<Vec<u8>>,
 }
-impl BspValue for BspTexture {
+
+impl std::fmt::Debug for BspTextureData {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("BspTextureData")
+			.field("full", &self.full.as_ref().map(|_| ..))
+			.field("half", &self.half.as_ref().map(|_| ..))
+			.field("quarter", &self.quarter.as_ref().map(|_| ..))
+			.field("eighth", &self.eighth.as_ref().map(|_| ..))
+			.finish()
+	}
+}
+
+/// Embedded texture data. Goldsrc stores these in a separate lump.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspMipTexture {
+	pub header: BspTextureHeader,
+	pub data: BspTextureData,
+}
+
+impl BspValue for BspMipTexture {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let start_pos = reader.pos;
 		let header: BspTextureHeader = reader.read()?;
@@ -373,20 +389,17 @@ impl BspValue for BspTexture {
 		}
 
 		Ok(Self {
-			data: read_data!(offset_full, "full"),
-			data_half: read_data!(offset_half, "half", / 2),
-			data_quarter: read_data!(offset_quarter, "quarter", / 4),
-			data_eighth: read_data!(offset_eighth, "eighth", / 8),
+			data: BspTextureData {
+				full: read_data!(offset_full, "full"),
+				half: read_data!(offset_half, "half", / 2),
+				quarter: read_data!(offset_quarter, "quarter", / 4),
+				eighth: read_data!(offset_eighth, "eighth", / 8),
+			},
 			header,
 		})
 	}
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		BspTextureHeader::bsp_struct_size(ctx)
-	}
-}
-impl std::fmt::Debug for BspTexture {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.header.fmt(f)
 	}
 }
 
