@@ -196,11 +196,7 @@ pub struct BspData {
 	pub textures: Vec<Option<BspTexture>>,
 	/// All vertex positions.
 	pub vertices: Vec<Vec3>,
-	/// RLE encoded bit array.
-	///
-	/// See [the specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4) for more info.
-	///
-	/// TODO in the future, this crate might support visibility operations
+	/// Raw visibility data. Use [`visible_leaves_at()`](Self::visible_leaves_at) and related functions to query this data.
 	pub visibility: Vec<u8>,
 	pub nodes: Vec<BspNode>,
 	pub tex_info: Vec<BspTexInfo>,
