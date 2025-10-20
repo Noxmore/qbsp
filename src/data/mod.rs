@@ -7,11 +7,7 @@ pub mod q1bsp;
 
 pub use q1bsp as bsp;
 
-use std::{
-	marker::PhantomData,
-	ops::{Deref, DerefMut},
-	str::FromStr,
-};
+use std::{marker::PhantomData, str::FromStr};
 
 use crate::{bsp3x::BspTexExtraInfo, idtech2::BspNodeRef, *};
 
@@ -510,20 +506,33 @@ pub struct Bsp3xLumpEntry(Option<LumpEntry>);
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LumpDirectory {
+	/// String entity key/value map.
 	pub entities: LumpEntry,
+	/// Planes map for splitting the BSP tree.
 	pub planes: LumpEntry,
+	/// Embedded textures (not used for Quake 2).
 	pub textures: PreBsp38LumpEntry,
+	/// Mesh vertices for each leaf.
 	pub vertices: LumpEntry,
+	/// Visdata (cluster-based for Quake 2, leaf-basd for other formats).
 	pub visibility: LumpEntry,
+	/// Non-leaf nodes in the BSP tree.
 	pub nodes: LumpEntry,
+	/// Texture info.
 	pub tex_info: LumpEntry,
+	/// Faces of each mesh.
 	pub faces: LumpEntry,
+	/// Lightmap data.
 	pub lighting: LumpEntry,
+	/// Clip nodes. Not used for Quake 2, as it does collision using `leaf_brushes` and doesn't
+	/// have a concept of clip hulls.
 	pub clip_nodes: PreBsp38LumpEntry,
+	/// Leaf nodes in the BSP tree.
 	pub leaves: LumpEntry,
-	pub leaf_faces: Bsp38OnlyLumpEntry,
+	/// Leaves use this to index into the face lump.
+	pub mark_surfaces: LumpEntry,
+	/// Leaf brushes, for Quake 2 BSP collision checks.
 	pub leaf_brushes: Bsp38OnlyLumpEntry,
-	pub mark_surfaces: PreBsp38LumpEntry,
 	pub edges: LumpEntry,
 	pub surf_edges: LumpEntry,
 	pub models: LumpEntry,
@@ -554,9 +563,8 @@ impl LumpDirectory {
 			Some(self.lighting),
 			*self.clip_nodes,
 			Some(self.leaves),
-			*self.leaf_faces,
+			Some(self.mark_surfaces),
 			*self.leaf_brushes,
-			*self.mark_surfaces,
 			Some(self.edges),
 			Some(self.surf_edges),
 			Some(self.models),
@@ -585,9 +593,8 @@ impl BspValue for LumpDirectory {
 			lighting: reader.read().job("Reading lighting entry")?,
 			clip_nodes: reader.read().job("Reading clip_nodes entry")?,
 			leaves: reader.read().job("Reading leaves entry")?,
-			leaf_faces: reader.read().job("Reading leaves entry")?,
-			leaf_brushes: reader.read().job("Reading leaf brushes entry")?,
 			mark_surfaces: reader.read().job("Reading mark_surfaces entry")?,
+			leaf_brushes: reader.read().job("Reading leaf brushes entry")?,
 			edges: reader.read().job("Reading edges entry")?,
 			surf_edges: reader.read().job("Reading surf_edges entry")?,
 			models: reader.read().job("Reading models entry")?,

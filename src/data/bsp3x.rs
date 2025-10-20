@@ -108,20 +108,6 @@ impl From<ShortBsp29LeafContents> for BitFlags<BspLeafContentFlags> {
 	}
 }
 
-// impl BspValue for BspTexExtraInfo {
-// 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-// 		Ok(Self {
-// 			value: u32::bsp_parse(reader)?,
-// 			name: FixedStr::bsp_parse(reader)?,
-// 			next: i32::bsp_parse(reader)?,
-// 		})
-// 	}
-
-// 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-// 		u32::bsp_struct_size(ctx) + FixedStr::<32>::bsp_struct_size(ctx) + i32::bsp_struct_size(ctx)
-// 	}
-// }
-
 #[bitflags]
 #[derive(Debug, Copy, Clone)]
 #[repr(u32)]

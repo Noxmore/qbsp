@@ -245,17 +245,22 @@ pub struct BspData {
 	pub lighting: Option<BspLighting>,
 	pub clip_nodes: Vec<BspClipNode>,
 	pub leaves: Vec<BspLeaf>,
-	pub leaf_faces: (),
-	pub leaf_brushes: (),
+	// TODO: Leaf brushes, used for collision in Quake 2 (BSP38) maps as they don't use hulls.
+	// We should implement this but for now, `bevy_trenchbroom` can recalculate collision from
+	// the visible mesh.
+	// pub leaf_brushes: (),
 	/// Indices into the face list, pointed to by leaves.
 	pub mark_surfaces: Vec<UBspValue>,
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
 	pub models: Vec<BspModel>,
-	pub brushes: (),
-	pub areas: (),
-	pub area_portals: (),
-
+	// TODO: Are brushes/brush sides actually used in-game?
+	// pub brushes: (),
+	// pub brush_sides: (),
+	// TODO: Areas/area portals are used by Q2 to stop rendering areas after
+	// doors close - useful but not required to behave correctly.
+	// pub areas: (),
+	// pub area_portals: (),
 	pub bspx: BspxData,
 
 	/// Additional information from the BSP parsed. For example, contains the [BspFormat] of the file.
@@ -355,29 +360,10 @@ impl BspData {
 				vec![]
 			},
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
-			leaf_faces: {
-				// TODO: Leaf faces
-			},
-			leaf_brushes: {
-				// TODO: Leaf brushes
-			},
-			mark_surfaces: if let Some(mark_surfaces_lump) = *lump_dir.mark_surfaces {
-				read_lump(bsp, mark_surfaces_lump, "mark surfaces", &ctx)?
-			} else {
-				vec![]
-			},
+			mark_surfaces: read_lump(bsp, lump_dir.leaves, "mark surfaces", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
 			models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
-			brushes: {
-				// TODO: Brushes
-			},
-			areas: {
-				// TODO: Areas
-			},
-			area_portals: {
-				// TODO: Area portals
-			},
 
 			bspx,
 
