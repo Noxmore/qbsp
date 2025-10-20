@@ -290,7 +290,7 @@ pub struct ModelBrushes {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrush {
 	pub bound: BoundingBox,
-	pub contents: ShortBspLeafContents,
+	pub contents: ShortBsp29LeafContents,
 	/// Non-axial faces only. It's on you to add axial planes via the bounding box.
 	pub planes: BspVariableArray<ModelBrushPlane, u16>,
 }

@@ -124,7 +124,7 @@ impl Iterator for VisdataIterator<'_> {
 
 	fn next(&mut self) -> Option<Self::Item> {
 		loop {
-			if let Some(is_visible) = dbg!(self.cur_byte.as_mut()).and_then(|byte| dbg!(byte.next())) {
+			if let Some(is_visible) = self.cur_byte.as_mut().and_then(|byte| byte.next()) {
 				let value = self.vis_leaves.next();
 				if is_visible {
 					return value;

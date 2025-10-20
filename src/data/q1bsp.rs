@@ -2,13 +2,27 @@
 
 use super::*;
 use crate::{
-	bsp3x::{BspSurfaceFlags, BspTexExtraInfo},
-	idtech2::BspNodeRef,
+	bsp3x::{BspLeafContentFlags, BspSurfaceFlags, BspTexExtraInfo},
+	idtech2::BspNodeSubRef,
 	*,
 };
 
 use enumflags2::BitFlags;
 pub use idtech2::{BspEdge, BspFace};
+
+#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[bsp29(u32)]
+#[bsp2(u32)]
+#[bsp30(u32)]
+#[bsp38(NoField)]
+pub struct TextureIdxField(pub Option<u32>);
+
+#[derive(BspVariableValue, Debug, Clone, PartialEq, Eq)]
+#[bsp29(NoField)]
+#[bsp2(NoField)]
+#[bsp30(NoField)]
+#[bsp38(BspTexExtraInfo)]
+pub struct ExtraInfoField(pub Option<BspTexExtraInfo>);
 
 #[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -16,13 +30,13 @@ pub use idtech2::{BspEdge, BspFace};
 pub struct BspTexInfo {
 	pub projection: PlanarTextureProjection,
 
-	pub texture_idx: BspVariableValue<Option<u32>, u32, u32, NoField, u32>,
+	pub texture_idx: TextureIdxField,
 
 	/// Goldsrc and Q2 have surface flags, Q1 and BSP2 have texture flags.
-	pub flags: BspVariableValue<BspTexInfoFlags, BspTexFlags, BspTexFlags, BitFlags<BspSurfaceFlags>>,
+	pub flags: BspTexInfoFlags,
 
 	/// Extra info stored directly on the `TexInfo` - for Quake 2 (which does not have a lump for embedded textures).
-	pub extra_info: BspVariableValue<Option<BspTexExtraInfo>, NoField, NoField, BspTexExtraInfo, NoField>,
+	pub extra_info: ExtraInfoField,
 }
 
 impl BspTexExtraInfo {
@@ -78,9 +92,16 @@ impl From<BitFlags<BspSurfaceFlags>> for BspTexInfoFlags {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfoFlags {
 	/// If this is `None`, then the name should be used to check the texture flags (for Goldsrc and Quake 2)
-	texture_flags: Option<BspTexFlags>,
+	pub texture_flags: Option<BspTexFlags>,
 	/// For BSP2 and BSP29, this is always zero.
-	surface_flags: BitFlags<BspSurfaceFlags>,
+	pub surface_flags: BitFlags<BspSurfaceFlags>,
+}
+
+impl BspVariableValue for BspTexInfoFlags {
+	type Bsp29 = BspTexFlags;
+	type Bsp2 = BspTexFlags;
+	type Bsp30 = BitFlags<BspSurfaceFlags>;
+	type Bsp38 = BitFlags<BspSurfaceFlags>;
 }
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -97,20 +118,27 @@ pub enum BspTexFlags {
 	Missing = 2,
 }
 
+#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[bsp29(u32)]
+#[bsp2(u32)]
+#[bsp30(u32)]
+#[bsp38(NoField)]
+pub struct VisleafsField(pub Option<u32>);
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspModel {
-	pub bound: BoundingBox,
+	pub bound: FloatBoundingBox,
 	/// Origin of model, usually (0,0,0)
 	pub origin: Vec3,
 
-	/// If positive, index of clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
-	pub root_hulls: VariableRootHulls,
+	/// The indices for the BSP and clip roots.
+	pub root_hulls: Hulls,
 
 	/// Number of visleafs, not including the out-of-bounds leaf 0. Quake uses a cluster system for visibility,
 	/// and so this field is not included.
-	pub visleafs: BspVariableValue<Option<u32>, u32, u32, NoField, u32>,
+	pub visleafs: VisleafsField,
 
 	pub first_face: u32,
 	pub num_faces: u32,
@@ -163,11 +191,6 @@ pub enum BspPlaneType {
 
 /// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
 pub fn read_mip_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspMipTexture>>> {
-	// Quake 2 doesn't have this lump at all.
-	if reader.ctx.format == BspFormat::BSP38 {
-		return Ok(vec![]);
-	}
-
 	let mut textures = Vec::new();
 	let num_mip_textures: u32 = reader.read()?;
 
@@ -190,31 +213,15 @@ pub struct BspNode {
 	/// Index of the [`BspPlane`] that splits the node.
 	pub plane_idx: u32,
 
-	pub front: VariableBspNodeRef,
-	pub back: VariableBspNodeRef,
+	pub front: BspNodeSubRef,
+	pub back: BspNodeSubRef,
 
 	/// Bounding box of the node and all its children.
-	pub bound: VariableBoundingBox,
+	pub bound: BoundingBox,
 	/// Index of the first [`BspFace`] the node contains.
 	pub face_idx: UBspValue,
 	/// Number of faces this node contains.
 	pub face_num: UBspValue,
-}
-
-/// Wrapper over [`BspNodeRef`] that reads a [`IBspValue`] instead of an `i32`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct VariableBspNodeRef(pub BspNodeRef);
-impl BspValue for VariableBspNodeRef {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		let value = IBspValue::bsp_parse(reader)?;
-
-		Ok(Self(BspNodeRef::from_i32(value.0)))
-	}
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		IBspValue::bsp_struct_size(ctx)
-	}
 }
 
 /// According to the [`gamers.org` specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL9):
@@ -232,16 +239,16 @@ pub struct BspClipNode {
 	pub plane_idx: u32,
 
 	/// If positive, id of Front child node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
-	pub front: IBspValue,
+	pub front: BspNodeSubRef,
 	/// If positive, id of Back child node. If -2, the Back part is inside the model. If -1, the Back part is outside the model.
-	pub back: IBspValue,
+	pub back: BspNodeSubRef,
 }
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[repr(i32)]
-pub enum BspLeafContents {
+pub enum Bsp29LeafContents {
 	#[default]
 	Empty = -1,
 	Solid = -2,
@@ -263,12 +270,13 @@ pub enum BspLeafContents {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ShortBspLeafContents(pub BspLeafContents);
-impl BspValue for ShortBspLeafContents {
+pub struct ShortBsp29LeafContents(pub Bsp29LeafContents);
+
+impl BspValue for ShortBsp29LeafContents {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let value = reader.read::<i16>()? as i32;
 
-		BspLeafContents::bsp_parse(&mut BspByteReader::new(&value.to_le_bytes(), reader.ctx)).map(Self)
+		Bsp29LeafContents::bsp_parse(&mut BspByteReader::new(&value.to_le_bytes(), reader.ctx)).map(Self)
 	}
 
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
@@ -286,6 +294,13 @@ pub enum VisdataRef {
 	VisLeaves(i32),
 }
 
+impl BspVariableValue for VisdataRef {
+	type Bsp29 = i32;
+	type Bsp2 = i32;
+	type Bsp30 = i32;
+	type Bsp38 = i16;
+}
+
 impl From<i16> for VisdataRef {
 	fn from(value: i16) -> Self {
 		Self::Cluster(value)
@@ -298,23 +313,42 @@ impl From<i32> for VisdataRef {
 	}
 }
 
+#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[bsp29(NoField)]
+#[bsp2(NoField)]
+#[bsp30(NoField)]
+#[bsp38(u16)]
+pub struct BspArea(pub Option<u16>);
+
+#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[bsp29(Bsp29LeafContents)]
+#[bsp2(Bsp29LeafContents)]
+#[bsp30(BitFlags<BspLeafContentFlags>)]
+#[bsp38(BitFlags<BspLeafContentFlags>)]
+pub struct BspLeafContents(pub BitFlags<BspLeafContentFlags>);
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspLeaf {
 	pub contents: BspLeafContents,
-	/// Beginning of visibility lists, or `-1`.
-	pub vis_list: BspVariableValue<VisdataRef, i32, i32, i16, i32>,
 
-	pub bound: VariableBoundingBox,
+	/// Beginning of visibility lists, or `-1`. This is leaf-based for all formats other than BSP38 (Quake 2),
+	/// which uses visiblity clusters.
+	pub vis_list: VisdataRef,
+
+	pub area: BspArea,
+
+	/// The AABB bounding box of this leaf.
+	pub bound: BoundingBox,
 
 	/// Index in the `mark_surfaces` list.
 	pub face_idx: UBspValue,
 	/// Number of elements in the `mark_surfaces` list.
 	pub face_num: UBspValue,
 
-	pub ambience: BspVariableValue<Option<BspAmbience>, BspAmbience, BspAmbience, NoField, BspAmbience>,
-	pub leaf_brushes: BspVariableValue<Option<BspLeafBrushes>, NoField, NoField, BspLeafBrushes, NoField>,
+	pub ambience: Option<BspAmbience>,
+	pub leaf_brushes: Option<BspLeafBrushes>,
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -325,6 +359,13 @@ pub struct BspLeafBrushes {
 	pub num: u16,
 }
 
+impl BspVariableValue for Option<BspLeafBrushes> {
+	type Bsp29 = NoField;
+	type Bsp2 = NoField;
+	type Bsp30 = NoField;
+	type Bsp38 = BspLeafBrushes;
+}
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -333,6 +374,14 @@ pub struct BspAmbience {
 	pub sky: u8,
 	pub slime: u8,
 	pub lava: u8,
+}
+
+impl BspVariableValue for Option<BspAmbience> {
+	type Bsp29 = BspAmbience;
+	type Bsp2 = BspAmbience;
+	type Bsp30 = BspAmbience;
+	// Quake 2 does not have the `ambience` field in bsp leaf.
+	type Bsp38 = NoField;
 }
 
 #[derive(Clone)]

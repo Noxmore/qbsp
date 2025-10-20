@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{bsp3x::BspLeafContentFlags, idtech2::BspNodeRef, *};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RaycastResult {
@@ -21,7 +21,7 @@ pub struct RaycastImpact {
 impl BspData {
 	/// Returns the index of the BSP leaf `point` is in of `model`.
 	pub fn leaf_at_point(&self, model_idx: usize, point: Vec3) -> usize {
-		self.leaf_at_point_in_node(self.models[model_idx].head_bsp_node, point)
+		self.leaf_at_point_in_node(self.models[model_idx].root_hulls.bsp_root, point)
 	}
 
 	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [`Self::leaf_at_point`].
@@ -34,9 +34,9 @@ impl BspData {
 					let plane = &self.planes[node.plane_idx as usize];
 
 					if plane.point_side(point) >= 0. {
-						node_ref = node.front.0;
+						node_ref = *node.front;
 					} else {
-						node_ref = node.back.0;
+						node_ref = *node.back;
 					}
 				}
 			}
@@ -49,8 +49,11 @@ impl BspData {
 	/// area. In this case, most BSP implementations consider all leaves visible.
 	pub fn visible_leaf_indices_of_leaf(&self, leaf_idx: usize) -> Option<impl Iterator<Item = usize> + '_> {
 		let vis_offset = self.leaves.get(leaf_idx)?.vis_list;
+		let VisdataRef::VisLeaves(vis_offset_leaves) = vis_offset else {
+			todo!("Visclusters not yet supported");
+		};
 		// Return `None` if vis_offset is `-1`.
-		let vis_offset: usize = vis_offset.try_into().ok()?;
+		let vis_offset: usize = vis_offset_leaves.try_into().ok()?;
 
 		Some(util::potentially_visible_leaf_indices(
 			self.visibility.get(vis_offset..)?,
@@ -89,8 +92,6 @@ impl BspData {
 
 		const DIST_EPSILON: f32 = 0.03125;
 
-		let model = self.models[model_idx];
-
 		struct Ctx<'a> {
 			start: Vec3,
 			end: Vec3,
@@ -118,10 +119,10 @@ impl BspData {
 
 				// Close the area around the ray.
 				if from_dist >= 0. && to_dist >= 0. {
-					node_ref = node.front.0;
+					node_ref = *node.front;
 					continue 'reenter;
 				} else if from_dist < 0. && to_dist < 0. {
-					node_ref = node.back.0;
+					node_ref = *node.back;
 					continue 'reenter;
 				}
 
@@ -135,15 +136,15 @@ impl BspData {
 				let mid = from.lerp(to, frac);
 
 				// Trace through child nodes near child first
-				let side_result = internal(ctx, if front_side { node.front.0 } else { node.back.0 }, from, mid);
-				if ctx.data.leaves[side_result.leaf_idx].contents == BspLeafContents::Solid {
+				let side_result = internal(ctx, if front_side { *node.front } else { *node.back }, from, mid);
+				if ctx.data.leaves[side_result.leaf_idx].contents.contains(BspLeafContentFlags::Solid) {
 					return side_result;
 				}
 
 				// Sort of hacky, but this is what Quake's implementation does, so i guess it's fine.
-				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { node.back.0 } else { node.front.0 }, mid);
-				if ctx.data.leaves[mid_leaf_idx].contents != BspLeafContents::Solid {
-					return internal(ctx, if front_side { node.back.0 } else { node.front.0 }, mid, to);
+				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { *node.back } else { *node.front }, mid);
+				if !ctx.data.leaves[mid_leaf_idx].contents.contains(BspLeafContentFlags::Solid) {
+					return internal(ctx, if front_side { *node.back } else { *node.front }, mid, to);
 				}
 
 				// The contents at mid are solid, we hit something!
@@ -173,6 +174,6 @@ impl BspData {
 			data: self,
 		};
 
-		internal(&ctx, model.head_bsp_node, from, to)
+		internal(&ctx, self.models[model_idx].root_hulls.bsp_root, from, to)
 	}
 }

@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{idtech2::BspNodeRef, *};
 
 #[derive(Clone, Copy)]
 pub struct TestingBsp {
@@ -30,6 +30,26 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	testing_bsp!("ad_crucial.bsp", "ad_crucial.lit"),
 	testing_bsp!("ad_end.bsp", "ad_end.lit"),
 	testing_bsp!("ad_tears.bsp", "ad_tears.lit"),
+	testing_bsp!("librequake/lq_e0m1.bsp"),
+	testing_bsp!("librequake/lq_e0m2.bsp"),
+	testing_bsp!("librequake/lq_e0m3.bsp"),
+	testing_bsp!("librequake/lq_e0m4.bsp"),
+	testing_bsp!("librequake/lq_e0m1-quake2.bsp"),
+	testing_bsp!("librequake/lq_e0m2-quake2.bsp"),
+	testing_bsp!("librequake/lq_e0m3-quake2.bsp"),
+	testing_bsp!("librequake/lq_e0m4-quake2.bsp"),
+	// I couldn't find any FOSS Goldsrc .bsp files and couldn't
+	// work out how to compile my own in a way that didn't end
+	// up compiling proprietary HL1 textures into the .bsp,
+	// but if you put your own copy of some HL1 maps into the
+	// `assets/halflife` directory you can test this code
+	// against them.
+	// testing_bsp!("halflife/c0a0.bsp"),
+	// testing_bsp!("halflife/c0a0a.bsp"),
+	// testing_bsp!("halflife/c0a0b.bsp"),
+	// testing_bsp!("halflife/c0a0c.bsp"),
+	// testing_bsp!("halflife/c0a0d.bsp"),
+	// testing_bsp!("halflife/c0a0e.bsp"),
 	EXAMPLE_BSP,
 ];
 
@@ -93,8 +113,6 @@ fn validate_bounds() {
 	}
 
 	for TestingBsp { name, bsp, lit } in TESTING_BSPS.iter().copied() {
-		println!("{name}");
-
 		let data = BspData::parse(BspParseInput {
 			bsp,
 			lit,
@@ -102,17 +120,41 @@ fn validate_bounds() {
 		})
 		.unwrap();
 
+		if name.ends_with("-quake2.bsp") {
+			assert_eq!(
+				data.format,
+				BspFormat::BSP38,
+				"{name} was of wrong format (expecting BSP38, found {})",
+				data.format
+			);
+			assert!(data.version.is_some());
+		}
+
+		if name.starts_with("halflife") {
+			assert_eq!(
+				data.format,
+				BspFormat::BSP30,
+				"{name} was of wrong format (expecting BSP30, found {})",
+				data.format
+			);
+			assert!(data.version.is_none());
+		}
+
 		// We max(0) the lengths here to make index 0 a valid index for a length of 0
 
 		for node in &data.nodes {
 			assert!(node.plane_idx < data.planes.len().max(1) as u32);
 			validate_range(node.face_idx.0, node.face_num.0, data.faces.len());
-			validate_node_ref(&node.front.0, &data);
-			validate_node_ref(&node.back.0, &data);
+			validate_node_ref(&node.front, &data);
+			validate_node_ref(&node.back, &data);
 		}
 
 		for tex_info in &data.tex_info {
-			assert!(tex_info.texture_idx < data.textures.len().max(1) as u32);
+			if let Some(texture_idx) = *tex_info.texture_idx {
+				assert!(texture_idx < data.textures.len().max(1) as u32);
+			} else {
+				assert!(tex_info.extra_info.is_some());
+			}
 		}
 
 		for face in &data.faces {
@@ -125,14 +167,21 @@ fn validate_bounds() {
 
 		for clip_node in &data.clip_nodes {
 			assert!(clip_node.plane_idx < data.planes.len().max(1) as u32);
-			assert!((clip_node.front.0 as i64) < data.clip_nodes.len().max(1) as i64);
-			assert!((clip_node.back.0 as i64) < data.clip_nodes.len().max(1) as i64);
+			assert!(clip_node.front.leaf().is_some() || (clip_node.front.node().unwrap() as usize) < data.clip_nodes.len().max(1));
+			assert!(clip_node.back.leaf().is_some() || (clip_node.back.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 		}
 
 		for leaf in &data.leaves {
+			match leaf.vis_list {
+				VisdataRef::VisLeaves(vis_list) => {
+					assert!((vis_list as i64) < data.visibility.len() as i64);
+					validate_range(leaf.face_idx.0, leaf.face_num.0, data.mark_surfaces.len());
+				}
+				VisdataRef::Cluster(cluster) => {
+					assert!((cluster as i64) < data.visibility.len() as i64);
+				}
+			}
 			// TODO PVS support
-			// assert!((leaf.vis_list as i64) < data.visibility.len() as i64);
-			validate_range(leaf.face_idx.0, leaf.face_num.0, data.mark_surfaces.len());
 		}
 
 		for surface_idx in &data.mark_surfaces {
@@ -149,9 +198,11 @@ fn validate_bounds() {
 		}
 
 		for model in &data.models {
-			validate_node_ref(&model.head_bsp_node, &data);
-			assert!((model.first_clip_node as i64) < data.clip_nodes.len().max(1) as i64);
-			assert!((model.second_clip_node as i64) < data.clip_nodes.len().max(1) as i64);
+			validate_node_ref(&model.root_hulls.bsp_root, &data);
+			if let Some(clip_nodes) = model.root_hulls.clip_nodes {
+				assert!((clip_nodes[0].node().unwrap() as usize) < data.clip_nodes.len().max(1));
+				assert!((clip_nodes[1].node().unwrap() as usize) < data.clip_nodes.len().max(1));
+			}
 
 			validate_range(model.first_face, model.num_faces, data.faces.len());
 		}

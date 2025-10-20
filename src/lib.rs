@@ -117,36 +117,52 @@ pub enum BspFormat {
 	/// Original quake format, in most cases, you should use BSP2 over this.
 	BSP29,
 
-	/// Quake 2 format. For the sake of `BspVariableValue`, this is usually the same as `BSP2`.
-	BSP38,
-
-	/// Goldsrc format. For the sake of `BspVariableValue`, this is usually the same as `BSP2`,
+	/// Goldsrc format. For the sake of `BspVariableValue`, this is usually the same as `BSP38`,
 	/// but differs in some cases (e.g. each model having up to 4 hulls).
 	BSP30,
+
+	/// Quake 2 format.
+	BSP38,
 }
+
 impl BspFormat {
 	pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
 		match &data {
 			b"BSP2" => Ok(Self::BSP2),
 			[0x1D, 0x00, 0x00, 0x00] => Ok(Self::BSP29),
 			[0x1E, 0x00, 0x00, 0x00] => Ok(Self::BSP30),
-			[0x26, 0x00, 0x00, 0x00] => Ok(Self::BSP38),
+			b"IBSP" => Ok(Self::BSP38),
 			_ => Err(BspParseError::WrongMagicNumber {
 				found: data,
-				expected: "BSP2 or 0x1D for BSP29",
+				expected: "BSP2, 0x1D000000 (BSP29), 0x1E000000 (BSP30), or IBSP (BSP38)",
 			}),
 		}
 	}
 }
+
+impl std::fmt::Display for BspFormat {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			BspFormat::BSP2 => write!(f, "BSP2"),
+			BspFormat::BSP29 => write!(f, "BSP29"),
+			BspFormat::BSP30 => write!(f, "BSP30"),
+			BspFormat::BSP38 => write!(f, "BSP38"),
+		}
+	}
+}
+
+#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[bsp29(NoField)]
+#[bsp2(NoField)]
+#[bsp30(NoField)]
+#[bsp38(u32)]
+pub struct BspVersion(Option<u32>);
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspParseContext {
 	pub format: BspFormat,
-	/// If the texture data is stored separately (only for BSP30 - Goldsrc), this is the parsed
-	/// miptex data.
-	pub miptexes: Option<Vec<BspMipTexture>>,
 }
 
 /// An Id Tech 1 palette to use for embedded images.
@@ -184,6 +200,12 @@ impl Palette {
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
 pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
 	let lump_data = entry.get(data)?;
+	assert_eq!(
+		entry.len as usize % T::bsp_struct_size(ctx),
+		0,
+		"Lump {lump_name} is the wrong size for {}",
+		std::any::type_name::<T>()
+	);
 	let lump_entries = entry.len as usize / T::bsp_struct_size(ctx);
 
 	let mut reader = BspByteReader::new(lump_data, ctx);
@@ -201,12 +223,14 @@ pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspData {
+	pub format: BspFormat,
+	pub version: Option<u32>,
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.
 	/// - Brush entities have a `model` property indexing into the `models` field of this struct.
 	pub entities: String,
 	pub planes: Vec<BspPlane>,
-	pub textures: Vec<Option<BspTexture>>,
+	pub textures: Vec<Option<BspMipTexture>>,
 	/// All vertex positions.
 	pub vertices: Vec<Vec3>,
 	/// RLE encoded bit array.
@@ -221,11 +245,16 @@ pub struct BspData {
 	pub lighting: Option<BspLighting>,
 	pub clip_nodes: Vec<BspClipNode>,
 	pub leaves: Vec<BspLeaf>,
+	pub leaf_faces: (),
+	pub leaf_brushes: (),
 	/// Indices into the face list, pointed to by leaves.
 	pub mark_surfaces: Vec<UBspValue>,
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
 	pub models: Vec<BspModel>,
+	pub brushes: (),
+	pub areas: (),
+	pub area_portals: (),
 
 	pub bspx: BspxData,
 
@@ -233,7 +262,7 @@ pub struct BspData {
 	pub parse_ctx: BspParseContext,
 }
 
-/// Offsets for each 
+/// Offsets for each
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct BspVisDataOffsets {
 	/// Index into `visibility` where the potentially visible set starts.
@@ -243,7 +272,7 @@ pub struct BspVisDataOffsets {
 }
 
 pub struct BspVisData {
-	pub cluster_offsets: <BspVisDataOffsets>,
+	pub cluster_offsets: BspVisDataOffsets,
 	pub visibility: Vec<u8>,
 }
 
@@ -263,6 +292,9 @@ impl BspData {
 			format: BspFormat::from_magic_number(bsp[0..4].try_into().unwrap())?,
 		};
 		let mut reader = BspByteReader::new(&bsp[4..], &ctx);
+		// For now, the version field is ignored. As a few different formats use the `IBSP` magic,
+		// we should probably check this to ensure that we can actually read it.
+		let version: BspVersion = reader.read()?;
 
 		let lump_dir: LumpDirectory = reader.read()?;
 
@@ -281,14 +313,20 @@ impl BspData {
 		let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
 
 		let data = Self {
+			format: ctx.format,
+			version: version.0,
 			entities: std::str::from_utf8(&entities_bytes)
 				.map_err(BspParseError::map_utf8_error(&entities_bytes))
 				.job("Reading entities lump")?
 				.to_string(),
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
-			textures: read_mip_texture_lump(&mut BspByteReader::new(lump_dir.textures.get(bsp)?, &ctx)).job("Reading texture lump")?,
+			textures: if let Some(tex_lump) = *lump_dir.textures {
+				read_mip_texture_lump(&mut BspByteReader::new(tex_lump.get(bsp)?, &ctx)).job("Reading texture lump")?
+			} else {
+				vec![]
+			},
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
-			visibility: lump_dir.vertices.get(bsp)?.to_vec(),
+			visibility: lump_dir.visibility.get(bsp)?.to_vec(),
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
@@ -311,12 +349,35 @@ impl BspData {
 					Some(BspLighting::White(lighting.to_vec()))
 				}
 			},
-			clip_nodes: read_lump(bsp, lump_dir.clip_nodes, "clip nodes", &ctx)?,
+			clip_nodes: if let Some(clip_node_lump) = *lump_dir.clip_nodes {
+				read_lump(bsp, clip_node_lump, "clip nodes", &ctx)?
+			} else {
+				vec![]
+			},
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
-			mark_surfaces: read_lump(bsp, lump_dir.mark_surfaces, "mark surfaces", &ctx)?,
+			leaf_faces: {
+				// TODO: Leaf faces
+			},
+			leaf_brushes: {
+				// TODO: Leaf brushes
+			},
+			mark_surfaces: if let Some(mark_surfaces_lump) = *lump_dir.mark_surfaces {
+				read_lump(bsp, mark_surfaces_lump, "mark surfaces", &ctx)?
+			} else {
+				vec![]
+			},
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
 			models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
+			brushes: {
+				// TODO: Brushes
+			},
+			areas: {
+				// TODO: Areas
+			},
+			area_portals: {
+				// TODO: Area portals
+			},
 
 			bspx,
 
@@ -328,14 +389,16 @@ impl BspData {
 
 	/// Parses embedded textures using the provided palette. Use [`QUAKE_PALETTE`] for the default Quake palette.
 	pub fn parse_embedded_textures<'a, 'p: 'a>(&'a self, palette: &'p Palette) -> impl Iterator<Item = (&'a str, image::RgbImage)> + 'a {
-		self.textures.iter().flatten().filter(|texture| texture.data.is_some()).map(|texture| {
-			let Some(data) = &texture.data else { unreachable!() };
+		self.textures.iter().flatten().filter_map(|texture| {
+			let Some(data) = &texture.data.full else {
+				return None;
+			};
 
 			let image = image::RgbImage::from_fn(texture.header.width, texture.header.height, |x, y| {
 				image::Rgb(palette.colors[data[(y * texture.header.width + x) as usize] as usize])
 			});
 
-			(texture.header.name.as_str(), image)
+			Some((texture.header.name.as_str(), image))
 		})
 	}
 }

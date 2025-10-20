@@ -42,9 +42,12 @@ macro_rules! impl_from_no_field_for_option {
 }
 
 impl_from_no_field_for_option!(u32);
+impl_from_no_field_for_option!(u16);
 impl_from_no_field_for_option!(BspTexExtraInfo);
 impl_from_no_field_for_option!(BspAmbience);
 impl_from_no_field_for_option!(BspLeafBrushes);
+impl_from_no_field_for_option!(LumpEntry);
+impl_from_no_field_for_option!([BspNodeRef; 3]);
 
 /// Like a [`Cursor`](std::io::Cursor), but i don't have to constantly juggle buffers.
 pub struct BspByteReader<'a> {
@@ -168,78 +171,61 @@ impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
 	}
 }
 
-/// A value in a BSP file where its size differs between formats. `Generic` represents the
-/// value that can represent all of the format-specific types.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspVariableValue<Generic, BSP29, BSP2 = Generic, BSP38 = BSP2, BSP30 = BSP38>(
-	pub Generic,
-	#[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<(BSP29, BSP2, BSP38, BSP30)>,
-);
-
-impl<Generic, BSP2, BSP29, BSP38, BSP30> BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
-	pub fn new(value: Generic) -> Self {
-		Self(value, PhantomData)
-	}
+/// A value in a BSP file where its size differs between formats. Should be implemented for the "output type", that
+/// will be the final type exposed in the `BspData`.
+pub trait BspVariableValue: Sized {
+	/// The type of this field for BSP v29 (Quake 1). See [Quake Wiki](https://quakewiki.org/wiki/Quake_BSP_Format).
+	type Bsp29: BspValue + Into<Self>;
+	/// The type of this field for BSP2 (BSP v29 with increased limits, originally for RemakeQuake). See [Quake Wiki](https://quakewiki.org/wiki/BSP2).
+	type Bsp2: BspValue + Into<Self>;
+	/// The type of this field for BSP30 (Goldsrc). See [Valve Developer Community](https://developer.valvesoftware.com/wiki/BSP_(GoldSrc)).
+	type Bsp30: BspValue + Into<Self>;
+	/// The type of this field for BSP38 (Quake 2). See [Flipcode](https://www.flipcode.com/archives/Quake_2_BSP_File_Format.shtml).
+	type Bsp38: BspValue + Into<Self>;
 }
 
-impl<Generic, BSP2, BSP29, BSP38, BSP30> BspValue for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30>
+impl<T> BspValue for T
 where
-	BSP2: BspValue + Into<Generic>,
-	BSP29: BspValue + Into<Generic>,
-	BSP38: BspValue + Into<Generic>,
-	BSP30: BspValue + Into<Generic>,
+	T: BspVariableValue,
 {
-	#[inline]
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
-			BspFormat::BSP2 => Ok(Self::new(BSP2::bsp_parse(reader)?.into())),
-			BspFormat::BSP29 => Ok(Self::new(BSP29::bsp_parse(reader)?.into())),
-			BspFormat::BSP38 => Ok(Self::new(BSP38::bsp_parse(reader)?.into())),
-			BspFormat::BSP30 => Ok(Self::new(BSP30::bsp_parse(reader)?.into())),
+			BspFormat::BSP2 => T::Bsp2::bsp_parse(reader).map(Into::into),
+			BspFormat::BSP29 => T::Bsp29::bsp_parse(reader).map(Into::into),
+			BspFormat::BSP30 => T::Bsp30::bsp_parse(reader).map(Into::into),
+			BspFormat::BSP38 => T::Bsp38::bsp_parse(reader).map(Into::into),
 		}
 	}
-	#[inline]
+
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
 		match ctx.format {
-			BspFormat::BSP2 => BSP2::bsp_struct_size(ctx),
-			BspFormat::BSP29 => BSP29::bsp_struct_size(ctx),
-			BspFormat::BSP38 => BSP38::bsp_struct_size(ctx),
-			BspFormat::BSP30 => BSP30::bsp_struct_size(ctx),
+			BspFormat::BSP2 => T::Bsp2::bsp_struct_size(ctx),
+			BspFormat::BSP29 => T::Bsp29::bsp_struct_size(ctx),
+			BspFormat::BSP30 => T::Bsp30::bsp_struct_size(ctx),
+			BspFormat::BSP38 => T::Bsp38::bsp_struct_size(ctx),
 		}
-	}
-}
-impl<BSP2, BSP29> Deref for BspVariableValue<BSP2, BSP29> {
-	type Target = BSP2;
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-impl<BSP2, BSP29> DerefMut for BspVariableValue<BSP2, BSP29> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
-}
-impl<Generic: std::fmt::Debug, BSP29, BSP2, BSP38, BSP30> std::fmt::Debug for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.fmt(f)
-	}
-}
-impl<Generic: std::fmt::Display, BSP29, BSP2, BSP38, BSP30> std::fmt::Display for BspVariableValue<Generic, BSP29, BSP2, BSP38, BSP30> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.fmt(f)
 	}
 }
 
 /// An unsigned variable integer parsed from a BSP. u32 when parsing BSP2, u16 when parsing BSP29.
 ///
-/// In almost all cases, BSP38 and BSP30 do not have increasd limits, and so they still use 16-bit indices.
-pub type UBspValue = BspVariableValue<u32, u16, u32, u16, u16>;
+/// In almost all cases, BSP38 and BSP30 do not have increased limits, and so they still use 16-bit indices.
+#[derive(BspVariableValue, Hash, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[bsp29(u16)]
+#[bsp2(u32)]
+#[bsp30(u16)]
+#[bsp38(u16)]
+pub struct UBspValue(pub u32);
+
 /// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
 ///
-/// In almost all cases, BSP38 and BSP30 do not have increasd limits, and so they still use 16-bit indices.
-pub type IBspValue = BspVariableValue<i32, i16, i32, i16, i16>;
+/// In almost all cases, BSP38 and BSP30 do not have increased limits, and so they still use 16-bit indices.
+#[derive(BspVariableValue, Hash, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[bsp29(i16)]
+#[bsp2(i32)]
+#[bsp30(i16)]
+#[bsp38(i16)]
+pub struct IBspValue(pub i32);
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -381,20 +367,24 @@ impl<'de, const N: usize> Deserialize<'de> for FixedStr<N> {
 	}
 }
 
-#[derive(BspValue, Debug, Clone, Copy)]
+/// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BoundingBox {
 	pub min: Vec3,
 	pub max: Vec3,
 }
-#[derive(BspValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ShortBoundingBox {
-	pub min: U16Vec3,
-	pub max: U16Vec3,
+
+impl From<FloatBoundingBox> for BoundingBox {
+	fn from(value: FloatBoundingBox) -> Self {
+		Self {
+			min: value.min,
+			max: value.max,
+		}
+	}
 }
+
 impl From<ShortBoundingBox> for BoundingBox {
 	fn from(value: ShortBoundingBox) -> Self {
 		Self {
@@ -404,34 +394,27 @@ impl From<ShortBoundingBox> for BoundingBox {
 	}
 }
 
-/// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
-pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
-
-#[derive(Clone, PartialEq, Debug, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-struct RootHulls<const COUNT: usize>([BspNodeRef; COUNT]);
-
-impl From<RootHulls<1>> for RootHulls<4> {
-	fn from(value: RootHulls<1>) -> Self {
-		let mut out = [BspNodeRef::Leaf(0); 4];
-
-		for (src, dst) in value.0.into_iter().zip(&mut out) {
-			*dst = src;
-		}
-
-		RootHulls(out)
-	}
+impl BspVariableValue for BoundingBox {
+	type Bsp29 = ShortBoundingBox;
+	type Bsp2 = FloatBoundingBox;
+	type Bsp30 = ShortBoundingBox;
+	type Bsp38 = ShortBoundingBox;
 }
 
-impl<const COUNT: usize> BspValue for RootHulls<COUNT> {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		Ok(Self(<[_; COUNT]>::bsp_parse(reader)?))
-	}
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FloatBoundingBox {
+	pub min: Vec3,
+	pub max: Vec3,
+}
 
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		<[i32; COUNT]>::bsp_struct_size(ctx)
-	}
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ShortBoundingBox {
+	pub min: U16Vec3,
+	pub max: U16Vec3,
 }
 
 /// Annoyingly, Quake 2 is the only format that has a differing number of root hulls. This is because
@@ -445,7 +428,21 @@ impl<const COUNT: usize> BspValue for RootHulls<COUNT> {
 /// that the 4th hull is "usually zero" in Quake 1.
 /// [The Valve Developer Wiki](https://developer.valvesoftware.com/wiki/BSP_(GoldSrc)) says "hull
 /// 3 is unused in Quake" (meaning the 4th hull, as the 1st hull is hull 0).
-pub type VariableRootHulls = BspVariableValue<RootHulls<4>, RootHulls<4>, RootHulls<4>, RootHulls<1>, RootHulls<4>>;
+#[derive(BspValue, Clone, PartialEq, Debug, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Hulls {
+	pub bsp_root: BspNodeRef,
+	/// If positive, index of clip node. If -2, the Front part is inside the model. If -1, the Front part is outside the model.
+	pub clip_nodes: Option<[BspNodeRef; 3]>,
+}
+
+impl BspVariableValue for Option<[BspNodeRef; 3]> {
+	type Bsp29 = [BspNodeRef; 3];
+	type Bsp2 = [BspNodeRef; 3];
+	type Bsp30 = [BspNodeRef; 3];
+	type Bsp38 = NoField;
+}
 
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -468,6 +465,46 @@ impl LumpEntry {
 	}
 }
 
+/// A `LumpEntry` that doesn't exist for BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(LumpEntry)]
+#[bsp29(LumpEntry)]
+#[bsp30(LumpEntry)]
+#[bsp38(NoField)]
+pub struct PreBsp38LumpEntry(Option<LumpEntry>);
+
+/// A `LumpEntry` that doesn't exist for BSP30 or BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(LumpEntry)]
+#[bsp29(LumpEntry)]
+#[bsp30(NoField)]
+#[bsp38(NoField)]
+pub struct PreBsp30LumpEntry(Option<LumpEntry>);
+
+/// A `LumpEntry` that only exists for BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(NoField)]
+#[bsp29(NoField)]
+#[bsp30(NoField)]
+#[bsp38(LumpEntry)]
+pub struct Bsp38OnlyLumpEntry(Option<LumpEntry>);
+
+/// A `LumpEntry` that only exists for BSP30 and BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(NoField)]
+#[bsp29(NoField)]
+#[bsp30(LumpEntry)]
+#[bsp38(LumpEntry)]
+pub struct Bsp3xLumpEntry(Option<LumpEntry>);
+
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -475,43 +512,65 @@ impl LumpEntry {
 pub struct LumpDirectory {
 	pub entities: LumpEntry,
 	pub planes: LumpEntry,
-	pub textures: LumpEntry,
+	pub textures: PreBsp38LumpEntry,
 	pub vertices: LumpEntry,
 	pub visibility: LumpEntry,
 	pub nodes: LumpEntry,
 	pub tex_info: LumpEntry,
 	pub faces: LumpEntry,
 	pub lighting: LumpEntry,
-	pub clip_nodes: LumpEntry,
+	pub clip_nodes: PreBsp38LumpEntry,
 	pub leaves: LumpEntry,
-	pub mark_surfaces: LumpEntry,
+	pub leaf_faces: Bsp38OnlyLumpEntry,
+	pub leaf_brushes: Bsp38OnlyLumpEntry,
+	pub mark_surfaces: PreBsp38LumpEntry,
 	pub edges: LumpEntry,
 	pub surf_edges: LumpEntry,
 	pub models: LumpEntry,
+	pub brushes: Bsp38OnlyLumpEntry,
+	pub brush_sides: Bsp38OnlyLumpEntry,
+	/// This field is unused in Quake 2, and it's unclear what its intention is.
+	/// We need to include it anyway though, otherwise areas and area portals
+	/// won't parse correctly.
+	pub pop: Bsp38OnlyLumpEntry,
+	pub areas: Bsp38OnlyLumpEntry,
+	pub area_portals: Bsp38OnlyLumpEntry,
 
 	pub bspx: BspxDirectory,
 }
 impl LumpDirectory {
-	pub fn bsp_entries(&self) -> [LumpEntry; 15] {
+	/// Does not include `bspx`, as this method is used to calculate the offset
+	/// to the BSPX lump.
+	pub fn bsp_entries(&self) -> impl Iterator<Item = LumpEntry> {
 		[
-			self.entities,
-			self.planes,
-			self.textures,
-			self.vertices,
-			self.visibility,
-			self.nodes,
-			self.tex_info,
-			self.faces,
-			self.lighting,
-			self.clip_nodes,
-			self.leaves,
-			self.mark_surfaces,
-			self.edges,
-			self.surf_edges,
-			self.models,
+			Some(self.entities),
+			Some(self.planes),
+			*self.textures,
+			Some(self.vertices),
+			Some(self.visibility),
+			Some(self.nodes),
+			Some(self.tex_info),
+			Some(self.faces),
+			Some(self.lighting),
+			*self.clip_nodes,
+			Some(self.leaves),
+			*self.leaf_faces,
+			*self.leaf_brushes,
+			*self.mark_surfaces,
+			Some(self.edges),
+			Some(self.surf_edges),
+			Some(self.models),
+			*self.brushes,
+			*self.brush_sides,
+			*self.pop,
+			*self.areas,
+			*self.area_portals,
 		]
+		.into_iter()
+		.flatten()
 	}
 }
+
 impl BspValue for LumpDirectory {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let mut dir = Self {
@@ -526,20 +585,32 @@ impl BspValue for LumpDirectory {
 			lighting: reader.read().job("Reading lighting entry")?,
 			clip_nodes: reader.read().job("Reading clip_nodes entry")?,
 			leaves: reader.read().job("Reading leaves entry")?,
+			leaf_faces: reader.read().job("Reading leaves entry")?,
+			leaf_brushes: reader.read().job("Reading leaf brushes entry")?,
 			mark_surfaces: reader.read().job("Reading mark_surfaces entry")?,
 			edges: reader.read().job("Reading edges entry")?,
 			surf_edges: reader.read().job("Reading surf_edges entry")?,
 			models: reader.read().job("Reading models entry")?,
+			brushes: reader.read().job("Reading brushes entry")?,
+			brush_sides: reader.read().job("Reading brush_sides entry")?,
+			pop: reader.read().job("Reading pop entry")?,
+			areas: reader.read().job("Reading areas entry")?,
+			area_portals: reader.read().job("Reading area_portals entry")?,
 
 			bspx: BspxDirectory::default(),
 		};
 
-		// TODO why subtract 4??
-		let bspx_offset = dir.bsp_entries().into_iter().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
-		match reader.with_pos(bspx_offset as usize).read() {
-			Ok(bspx_dir) => dir.bspx = bspx_dir,
-			Err(BspParseError::NoBspxDirectory) => {}
-			Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
+		// BSP30/BSP38 never have BSPX dir.
+		if [BspFormat::BSP29, BspFormat::BSP2].contains(&reader.ctx.format) {
+			// TODO why subtract 4??
+			// > Probably the magic number
+			let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
+
+			match reader.with_pos(bspx_offset as usize).read() {
+				Ok(bspx_dir) => dir.bspx = bspx_dir,
+				Err(BspParseError::NoBspxDirectory) => {}
+				Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
+			}
 		}
 
 		Ok(dir)

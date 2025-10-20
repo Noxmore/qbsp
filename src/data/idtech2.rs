@@ -1,17 +1,84 @@
 use glam::Vec3;
 
-use crate::{BspByteReader, BspData, BspParseContext, BspParseResultDoingJobExt, BspResult, BspValue, UBspValue};
+use crate::{BspByteReader, BspData, BspParseContext, BspParseResultDoingJobExt, BspResult, BspValue, BspVariableValue, IBspValue, UBspValue};
 
 /// A reference to a [`BspNode`]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum BspNodeRef {
-	Node(u32),
-	Leaf(u32),
+pub enum BspNodeRef<T = u32> {
+	Node(T),
+	Leaf(T),
+}
+
+impl BspValue for BspNodeRef<u32> {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		Ok(BspNodeRef::from_i32(i32::bsp_parse(reader)?))
+	}
+
+	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+		i32::bsp_struct_size(ctx)
+	}
+}
+
+impl BspValue for BspNodeRef<u16> {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		Ok(BspNodeRef::from_i16(i16::bsp_parse(reader)?))
+	}
+
+	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+		i16::bsp_struct_size(ctx)
+	}
+}
+
+/// A reference to a [`BspNode`]. Reads an `i32`, if positive it's an index of a node, if negative it's the index of a leaf.
+#[derive(BspVariableValue, Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp29(BspNodeRef<u16>)]
+#[bsp2(BspNodeRef<u32>)]
+#[bsp30(BspNodeRef<u16>)]
+#[bsp38(BspNodeRef<u32>)]
+pub struct BspNodeSubRef(BspNodeRef);
+
+impl From<BspNodeRef<u16>> for BspNodeRef<u32> {
+	fn from(value: BspNodeRef<u16>) -> Self {
+		match value {
+			BspNodeRef::Node(val) => BspNodeRef::Node(val.into()),
+			BspNodeRef::Leaf(val) => BspNodeRef::Leaf(val.into()),
+		}
+	}
 }
 
 impl BspNodeRef {
+	pub fn node(&self) -> Option<u32> {
+		match *self {
+			Self::Node(i) => Some(i),
+			Self::Leaf(_) => None,
+		}
+	}
+
+	pub fn leaf(&self) -> Option<u32> {
+		match *self {
+			Self::Leaf(i) => Some(i),
+			Self::Node(_) => None,
+		}
+	}
+}
+
+impl From<i32> for BspNodeRef {
+	fn from(value: i32) -> Self {
+		Self::from_i32(value)
+	}
+}
+
+impl From<i16> for BspNodeRef<u16> {
+	fn from(value: i16) -> Self {
+		Self::from_i16(value as _)
+	}
+}
+
+impl BspNodeRef<u32> {
 	pub fn from_i32(value: i32) -> Self {
 		if value.is_negative() {
 			Self::Leaf((-value) as u32 - 1) // - 1 because you can't have -0
@@ -21,12 +88,13 @@ impl BspNodeRef {
 	}
 }
 
-impl BspValue for BspNodeRef {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		Ok(Self::from_i32(reader.read()?))
-	}
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		size_of::<i32>()
+impl BspNodeRef<u16> {
+	pub fn from_i16(value: i16) -> Self {
+		if value.is_negative() {
+			Self::Leaf((-value) as u16 - 1) // - 1 because you can't have -0
+		} else {
+			Self::Node(value as u16)
+		}
 	}
 }
 
@@ -92,6 +160,7 @@ impl BspFace {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightmapStyle(pub u8);
+
 impl LightmapStyle {
 	/// Unanimated lightmap.
 	pub const NORMAL: Self = Self(0);
@@ -104,6 +173,7 @@ impl BspValue for LightmapStyle {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		reader.read().map(Self)
 	}
+
 	#[inline]
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 		1
