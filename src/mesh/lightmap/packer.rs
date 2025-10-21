@@ -1,3 +1,7 @@
+//! Module for packing a bunch of smaller lightmaps read from a BSP file together into a single lightmap atlas.
+//!
+//! Currently, this integrates with the [`texture_packer`] crate as the packing backend.
+
 use std::collections::HashMap;
 
 use glam::{uvec2, UVec2};

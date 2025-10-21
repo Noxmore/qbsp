@@ -1,3 +1,5 @@
+//! Module for computing lightmap atlases with various techniques for GPU rendering.
+
 use std::collections::HashMap;
 
 use glam::{uvec2, UVec2, Vec2};

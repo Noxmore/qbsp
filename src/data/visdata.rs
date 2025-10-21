@@ -1,3 +1,5 @@
+//! Data definitions for visibility data, storing which parts of the map can be seen from any given location.
+
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 use qbsp_macros::{BspValue, BspVariableValue};

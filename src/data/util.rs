@@ -1,3 +1,5 @@
+//! Utilities for BSP data that don't warrant their own modules.
+
 use std::{marker::PhantomData, str::FromStr};
 
 #[cfg(feature = "bevy_reflect")]

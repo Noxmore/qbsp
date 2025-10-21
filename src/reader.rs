@@ -1,3 +1,5 @@
+//! Module containing the core of reading a binary BSP file and interpreting it into structured data.
+
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 #[cfg(feature = "serde")]

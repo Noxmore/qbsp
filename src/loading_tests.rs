@@ -1,3 +1,5 @@
+//! Tests loading and checking the validity of BSP files.
+
 use crate::{
 	data::{lighting::BspLighting, nodes::BspNodeRef},
 	prelude::*,

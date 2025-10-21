@@ -1,3 +1,5 @@
+//! Module that re-exports common/necessary imports to make the user experience that much nicer.
+
 pub use crate::{BspData, BspParseError, BspParseInput, BspParseSettings, BspResult, BspVersion, QUAKE_PALETTE};
 
 pub use qbsp_macros::{BspValue, BspVariableValue};

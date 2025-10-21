@@ -1,4 +1,4 @@
-//! Turning [`BspData`] into a renderable mesh.
+//! Module for turning [`BspData`] into a renderable mesh.
 
 use std::collections::HashMap;
 

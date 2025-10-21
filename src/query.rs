@@ -1,3 +1,5 @@
+//! Module for various more advanced queries into [`BspData`], such as raycasting, potentially visible set, and potentially audible set.
+
 use glam::Vec3;
 
 use crate::{

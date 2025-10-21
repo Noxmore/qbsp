@@ -1,3 +1,5 @@
+//! Data definitions for textures and surface flags.
+
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 use bitflags::bitflags;

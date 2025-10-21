@@ -1,3 +1,5 @@
+//! Various utilities that don't fit cleanly into other modules, but are too small to warrant their own.
+
 use std::{ops::Range, slice::Iter};
 
 use glam::Vec2;
