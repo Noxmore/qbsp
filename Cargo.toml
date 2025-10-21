@@ -3,7 +3,7 @@ members = ["qbsp_macros", "tools/*"]
 
 [workspace.package]
 version = "0.6.2"
-description = "Rust crate for parsing and operating with Quake 1 BSP files"
+description = "Rust crate for parsing and operating with Quake 1, 2, and GoldSrc BSP files"
 edition = "2021"
 authors = ["Noxmore"]
 repository = "https://github.com/Noxmore/qbsp"
