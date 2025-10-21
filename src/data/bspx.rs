@@ -1,7 +1,26 @@
 //! [BSPX](https://developer.valvesoftware.com/wiki/BSPX) data definitions.
 
-use super::*;
-use crate::*;
+use std::{collections::HashMap, str::FromStr};
+
+#[cfg(feature = "bevy_reflect")]
+use bevy_reflect::Reflect;
+use glam::{U16Vec2, UVec3, Vec3};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+
+use qbsp_macros::BspValue;
+
+use crate::{
+	data::{
+		lighting::{BspLighting, LightmapStyle},
+		nodes::{BoundingBox, ShortBsp29LeafContents},
+		texture::PlanarTextureProjection,
+		util::{BspVariableArray, FixedStr},
+	},
+	reader::{BspByteReader, BspParseContext, BspValue},
+	BspParseError, BspParseResultDoingJobExt, BspResult, LumpEntry,
+};
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 
@@ -290,7 +309,7 @@ pub struct ModelBrushes {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrush {
 	pub bound: BoundingBox,
-	pub contents: ShortBspLeafContents,
+	pub contents: ShortBsp29LeafContents,
 	/// Non-axial faces only. It's on you to add axial planes via the bounding box.
 	pub planes: BspVariableArray<ModelBrushPlane, u16>,
 }

@@ -1,8 +1,18 @@
 //! Turning [`BspData`] into a renderable mesh.
 
-pub mod lightmap;
+use std::collections::HashMap;
 
-use crate::*;
+use glam::{vec2, IVec2, UVec2, Vec2, Vec3};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::{
+	data::{bspx::DecoupledLightmap, models::BspFace, texture::BspTexFlags},
+	util::Rect,
+	BspData,
+};
+
+pub mod lightmap;
 
 /// A mesh exported from a BSP file for rendering.
 #[derive(Debug, Clone, Default)]
@@ -37,7 +47,7 @@ impl BspData {
 	//      Also, support PVS data.
 
 	/// Meshes a model at the specified index. Returns one mesh for each texture used in the model.
-	pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&LightmapUvMap>) -> MeshModelOutput {
+	pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&lightmap::LightmapUvMap>) -> MeshModelOutput {
 		let model = &self.models[model_idx];
 
 		// Group faces by texture, also storing index for packing use
@@ -46,10 +56,17 @@ impl BspData {
 		for i in model.first_face..model.first_face + model.num_faces {
 			let face = &self.faces[i as usize];
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-			let Some(texture) = &self.textures[tex_info.texture_idx as usize] else { continue };
+			let Some(texture) = tex_info
+				.texture_idx
+				.and_then(|idx| self.textures.get(idx as usize))
+				.and_then(|tex| tex.as_ref())
+			else {
+				continue;
+			};
 
 			grouped_faces
-				.entry((texture.header.name.as_str(), tex_info.flags))
+				// TODO: We should figure out the texture flags from the name for BSP3x (Goldsrc/Quake 2)
+				.entry((texture.header.name.as_str(), tex_info.flags.texture_flags.unwrap_or_default()))
 				.or_default()
 				.push((i, face));
 		}
@@ -66,8 +83,14 @@ impl BspData {
 
 				let plane = &self.planes[face.plane_idx.0 as usize];
 				let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-				let texture_size = self.textures[tex_info.texture_idx as usize]
-					.as_ref()
+				// TODO: For formats that store textures externally (at time of writing, only Quake 2), we
+				// need to either provide a way for the caller to let us load textures or simply group by
+				// name and return the UVs unscaled (letting the caller scale them once the textures are
+				// loaded).
+				let texture_size = tex_info
+					.texture_idx
+					.and_then(|idx| self.textures.get(idx as usize))
+					.and_then(|tex| tex.as_ref())
 					.map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
 					.unwrap_or(Vec2::ONE);
 
@@ -118,6 +141,7 @@ pub struct FaceExtents {
 
 	precomputed_uv_snap: bool,
 }
+
 impl FaceExtents {
 	/// Calculates face extents from unscaled UVs.
 	pub fn new(uvs: impl IntoIterator<Item = Vec2>) -> Self {

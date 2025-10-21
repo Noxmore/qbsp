@@ -1,4 +1,13 @@
-use crate::*;
+use glam::Vec3;
+
+use crate::{
+	data::{
+		nodes::{BspLeafContentFlags, BspNodeRef},
+		visdata::VisdataRef,
+	},
+	util::{self, VisdataIter},
+	BspData,
+};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RaycastResult {
@@ -18,10 +27,43 @@ pub struct RaycastImpact {
 	// TODO Perhaps we also want to return the face it impacted?
 }
 
+/// The result of a potentially-visible or potentially-audible set query. For BSP38,
+/// this will be a set of clusters, and the `visdata` field of [`BspLeaf`](crate::data::nodes::BspLeaf)
+/// should be checked to see if a leaf is in the set. For BSP29, BSP2, and BSP30,
+/// this will just be leaf indices.
+///
+/// If you don't care about the BSP38 (Quake 2) format, just use [`Self::into_leaf_indices`].
+pub enum VisResult<'a> {
+	/// An iterator of cluster IDs.
+	Clusters(VisdataIter<'a>),
+	/// An iterator of leaf indices.
+	LeafIndices(VisdataIter<'a>),
+}
+
+impl<'a> VisResult<'a> {
+	/// If this is [`VisResult::Clusters`], return the inner iterator. Otherwise, return `Err(self)`.
+	pub fn into_clusters(self) -> Result<VisdataIter<'a>, Self> {
+		if let Self::Clusters(clusters) = self {
+			Ok(clusters)
+		} else {
+			Err(self)
+		}
+	}
+
+	/// If this is [`VisResult::LeafIndices`], return the inner iterator. Otherwise, return `Err(self)`.
+	pub fn into_leaf_indices(self) -> Result<VisdataIter<'a>, Self> {
+		if let Self::LeafIndices(leaf_indices) = self {
+			Ok(leaf_indices)
+		} else {
+			Err(self)
+		}
+	}
+}
+
 impl BspData {
 	/// Returns the index of the BSP leaf `point` is in of `model`.
 	pub fn leaf_at_point(&self, model_idx: usize, point: Vec3) -> usize {
-		self.leaf_at_point_in_node(self.models[model_idx].head_bsp_node, point)
+		self.leaf_at_point_in_node(self.models[model_idx].hulls.root, point)
 	}
 
 	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [`Self::leaf_at_point`].
@@ -34,45 +76,75 @@ impl BspData {
 					let plane = &self.planes[node.plane_idx as usize];
 
 					if plane.point_side(point) >= 0. {
-						node_ref = node.front.0;
+						node_ref = *node.front;
 					} else {
-						node_ref = node.back.0;
+						node_ref = *node.back;
 					}
 				}
 			}
 		}
 	}
 
-	/// Get the visible leaf indices of the leaf with index `leaf_idx`.
+	/// Get the potentially visible set of the leaf with index `leaf_idx`. These are the maximum set of leaves
+	/// that could ever be visible from this leaf. Depending on format, this will either be expressed as a set
+	/// of leaf indices ([`VisdataRef::Leaf`]), or a cluster ([`VisdataRef::Cluster`]). In the latter case, you
+	/// should check the `visdata` field of [`BspLeaf`](crate::data::nodes::BspLeaf) to work out which leaves
+	/// are visible.
 	///
 	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
 	/// area. In this case, most BSP implementations consider all leaves visible.
-	pub fn visible_leaf_indices_of_leaf(&self, leaf_idx: usize) -> Option<impl Iterator<Item = usize> + '_> {
-		let vis_offset = self.leaves.get(leaf_idx)?.vis_list;
-		// Return `None` if vis_offset is `-1`.
-		let vis_offset: usize = vis_offset.try_into().ok()?;
+	pub fn potentially_visible_set(&self, leaf_idx: usize) -> Option<VisResult<'_>> {
+		let vis_offset = self.leaves.get(leaf_idx)?.visdata;
+		let map_to_ref: fn(VisdataIter) -> VisResult = match vis_offset {
+			VisdataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
+			VisdataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
+		};
 
-		Some(util::potentially_visible_leaf_indices(
-			self.visibility.get(vis_offset..)?,
+		Some(map_to_ref(util::calculate_visdata_indices(
+			self.visibility.pvs(vis_offset)?,
 			self.leaves.len(),
-		))
+		)))
 	}
 
-	/// Get the visible leaf indices at the point `point` in the model at the index `model_idx`.
+	/// Get the potentially visible set at the point `point` in the model at the index `model_idx`. These are
+	/// the maximum set of leaves that could ever be visible from this leaf. Depending on format, this will
+	/// either be expressed as a set of leaf indices ([`VisdataRef::Leaf`]), or a cluster ([`VisdataRef::Cluster`]).
+	/// In the latter case, you should check the `visdata` field of [`BspLeaf`](crate::data::nodes::BspLeaf) to
+	/// work out which leaves are visible.
 	///
 	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
 	/// area. In this case, most BSP implementations consider all leaves visible.
-	pub fn visible_leaf_indices_at_point(&self, model_idx: usize, point: Vec3) -> Option<impl Iterator<Item = usize> + '_> {
-		self.visible_leaf_indices_of_leaf(self.leaf_at_point(model_idx, point))
+	pub fn potentially_visible_set_at(&self, model_idx: usize, point: Vec3) -> Option<VisResult<'_>> {
+		self.potentially_visible_set(self.leaf_at_point(model_idx, point))
 	}
 
-	/// Get the visible leaves at the point `point` in the model at the index `model_idx`.
+	/// Get the potentially audible set of the leaf with index `leaf_idx`.
 	///
 	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
-	/// area. In this case, most BSP implementations consider all leaves visible.
-	pub fn visible_leaves_at(&self, model_idx: usize, point: Vec3) -> Option<impl Iterator<Item = &BspLeaf> + '_> {
-		self.visible_leaf_indices_of_leaf(self.leaf_at_point(model_idx, point))
-			.map(|leaf_idxs| leaf_idxs.filter_map(|idx| self.leaves.get(idx)))
+	/// area. In this case, most BSP implementations consider all leaves audible.
+	///
+	/// > Note: This will only potentially return something different for Quake 2. All other implementations have identical
+	/// > implementations for whether two points are potentially-visible vs potentially-audible. In most cases, you want
+	/// > [`potentially_visible_set()`](Self::potentially_visible_set).
+	pub fn potentially_audible_set(&self, leaf_idx: usize) -> Option<VisResult<'_>> {
+		let vis_offset = self.leaves.get(leaf_idx)?.visdata;
+		let map_to_ref: fn(VisdataIter) -> VisResult = match vis_offset {
+			VisdataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
+			VisdataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
+		};
+
+		Some(map_to_ref(util::calculate_visdata_indices(
+			self.visibility.phs(vis_offset)?,
+			self.leaves.len(),
+		)))
+	}
+
+	/// Get the potentially audible set at the point `point` in the model at the index `model_idx`.
+	///
+	/// If `None`, the leaf has no visdata - this usually means that the leaf represents an out-of-bounds
+	/// area. In this case, most BSP implementations consider all leaves audible.
+	pub fn potentially_audible_set_at(&self, model_idx: usize, point: Vec3) -> Option<VisResult<'_>> {
+		self.potentially_audible_set(self.leaf_at_point(model_idx, point))
 	}
 
 	/// Implementation of Quake's `SV_RecursiveHullCheck` function.
@@ -88,8 +160,6 @@ impl BspData {
 		}
 
 		const DIST_EPSILON: f32 = 0.03125;
-
-		let model = self.models[model_idx];
 
 		struct Ctx<'a> {
 			start: Vec3,
@@ -118,10 +188,10 @@ impl BspData {
 
 				// Close the area around the ray.
 				if from_dist >= 0. && to_dist >= 0. {
-					node_ref = node.front.0;
+					node_ref = *node.front;
 					continue 'reenter;
 				} else if from_dist < 0. && to_dist < 0. {
-					node_ref = node.back.0;
+					node_ref = *node.back;
 					continue 'reenter;
 				}
 
@@ -135,15 +205,15 @@ impl BspData {
 				let mid = from.lerp(to, frac);
 
 				// Trace through child nodes near child first
-				let side_result = internal(ctx, if front_side { node.front.0 } else { node.back.0 }, from, mid);
-				if ctx.data.leaves[side_result.leaf_idx].contents == BspLeafContents::Solid {
+				let side_result = internal(ctx, if front_side { *node.front } else { *node.back }, from, mid);
+				if ctx.data.leaves[side_result.leaf_idx].contents.contains(BspLeafContentFlags::SOLID) {
 					return side_result;
 				}
 
 				// Sort of hacky, but this is what Quake's implementation does, so i guess it's fine.
-				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { node.back.0 } else { node.front.0 }, mid);
-				if ctx.data.leaves[mid_leaf_idx].contents != BspLeafContents::Solid {
-					return internal(ctx, if front_side { node.back.0 } else { node.front.0 }, mid, to);
+				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { *node.back } else { *node.front }, mid);
+				if !ctx.data.leaves[mid_leaf_idx].contents.contains(BspLeafContentFlags::SOLID) {
+					return internal(ctx, if front_side { *node.back } else { *node.front }, mid, to);
 				}
 
 				// The contents at mid are solid, we hit something!
@@ -173,6 +243,6 @@ impl BspData {
 			data: self,
 		};
 
-		internal(&ctx, model.head_bsp_node, from, to)
+		internal(&ctx, self.models[model_idx].hulls.root, from, to)
 	}
 }

@@ -1,8 +1,20 @@
-mod packer;
-pub use packer::*;
+use std::collections::HashMap;
 
-use super::*;
-use crate::*;
+use glam::{uvec2, UVec2, Vec2};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use thiserror::Error;
+
+mod packer;
+
+pub use packer::{DefaultLightmapPacker, LightmapPacker, LightmapPackerFaceView, PerSlotLightmapPacker, PerStyleLightmapPacker};
+
+use crate::{
+	data::{lighting::LightmapStyle, texture::BspTexFlags},
+	mesh::FaceExtents,
+	BspData, BspParseError,
+};
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -125,7 +137,7 @@ impl BspData {
 					LightmapInfo {
 						uvs,
 						extents,
-						lightmap_offset: face.lightmap_offset,
+						lightmap_offset: face.lightmap_offset.pixels,
 					}
 				}
 			};
@@ -144,10 +156,12 @@ impl BspData {
 			if lm_info.lightmap_offset.is_negative() || lm_info.extents.lightmap_size() == UVec2::ZERO {
 				lightmap_uvs.insert(
 					face_idx as u32,
-					if tex_info.flags != BspTexFlags::Normal {
-						special_reserved_pixel.get_uvs(&mut packer, view)?
-					} else {
+					if tex_info.flags.texture_flags.unwrap_or_default() == BspTexFlags::Normal {
+						// TODO: For BSP3x (Goldsrc/Quake 2), we should look at the texture name
+						// to figure out the texture flags.
 						empty_reserved_pixel.get_uvs(&mut packer, view)?
+					} else {
+						special_reserved_pixel.get_uvs(&mut packer, view)?
 					},
 				);
 				continue;

@@ -1,356 +1,31 @@
-//! BSP file data parsing.
+//! Datatype definitions for lumps within a BSP file.
 
-pub mod bsp;
+#[cfg(feature = "bevy_reflect")]
+use bevy_reflect::Reflect;
+use qbsp_macros::{BspValue, BspVariableValue};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue};
+use crate::{data::util::NoField, BspFormat, BspParseError, BspParseResultDoingJobExt, BspResult};
+
 pub mod bspx;
+pub mod lighting;
+pub mod models;
+pub mod nodes;
+pub mod texture;
+pub mod util;
+pub mod visdata;
 
-use std::{
-	marker::PhantomData,
-	ops::{Deref, DerefMut},
-	str::FromStr,
+// Re-exports for convenience and to reduce the load of refactoring when upgrading.
+pub use self::{
+	bspx::{BspxData, ModelBrush, ModelBrushPlane, ModelBrushes},
+	lighting::{BspLighting, LightmapOffset, LightmapStyle},
+	models::{BspEdge, BspFace, BspModel},
+	nodes::{BspClipNode, BspLeaf, BspNode, BspNodeRef, BspPlane},
+	texture::{BspMipTexture, BspTexFlags, BspTexInfo, Palette},
+	visdata::BspVisData,
 };
-
-use crate::*;
-
-/// Like a [`Cursor`](std::io::Cursor), but i don't have to constantly juggle buffers.
-pub struct BspByteReader<'a> {
-	pub ctx: &'a BspParseContext,
-	bytes: &'a [u8],
-	pos: usize,
-}
-impl<'a> BspByteReader<'a> {
-	#[inline]
-	pub fn new(bytes: &'a [u8], ctx: &'a BspParseContext) -> Self {
-		Self { ctx, bytes, pos: 0 }
-	}
-
-	#[inline]
-	pub fn read<T: BspValue>(&mut self) -> BspResult<T> {
-		T::bsp_parse(self)
-	}
-
-	pub fn read_bytes(&mut self, count: usize) -> BspResult<&[u8]> {
-		let (from, to) = (self.pos, self.pos + count);
-		if to > self.bytes.len() {
-			return Err(BspParseError::BufferOutOfBounds {
-				from,
-				to,
-				size: self.bytes.len(),
-			});
-		}
-		let bytes = &self.bytes[from..to];
-		self.pos += count;
-		Ok(bytes)
-	}
-
-	#[inline]
-	pub fn with_pos(&self, pos: usize) -> Self {
-		Self {
-			ctx: self.ctx,
-			bytes: self.bytes,
-			pos,
-		}
-	}
-
-	/// Returns `true` if `pos` is less than `bytes.len()`.
-	#[inline]
-	pub fn in_bounds(&self) -> bool {
-		self.pos < self.bytes.len()
-	}
-}
-
-/// Defines how a type should be read from a BSP file.
-pub trait BspValue: Sized {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize;
-}
-macro_rules! impl_bsp_parse_primitive {
-	($ty:ty) => {
-		impl BspValue for $ty {
-			#[inline]
-			fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-				Ok(<$ty>::from_le_bytes(reader.read_bytes(size_of::<$ty>())?.try_into().unwrap()))
-			}
-			#[inline]
-			fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-				size_of::<$ty>()
-			}
-		}
-	};
-}
-macro_rules! impl_bsp_parse_vector {
-	($ty:ty : [$element:ty; $count:expr]) => {
-		impl BspValue for $ty {
-			fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-				Ok(<$ty>::from_array(reader.read::<[$element; $count]>()?))
-			}
-			fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-				size_of::<$element>() * $count
-			}
-		}
-	};
-}
-
-impl_bsp_parse_primitive!(u16);
-impl_bsp_parse_primitive!(u32);
-
-impl_bsp_parse_primitive!(i16);
-impl_bsp_parse_primitive!(i32);
-
-impl_bsp_parse_primitive!(f32);
-
-impl BspValue for u8 {
-	#[inline]
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		reader.read_bytes(1).map(|bytes| bytes[0])
-	}
-	#[inline]
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		1
-	}
-}
-
-impl_bsp_parse_vector!(Vec3: [f32; 3]);
-impl_bsp_parse_vector!(IVec3: [i32; 3]);
-impl_bsp_parse_vector!(UVec3: [u32; 3]);
-impl_bsp_parse_vector!(U16Vec3: [u16; 3]);
-
-impl_bsp_parse_vector!(U16Vec2: [u16; 2]);
-
-// We'd have to change this if we want to impl BspRead for u8
-impl<T: BspValue + std::fmt::Debug, const N: usize> BspValue for [T; N] {
-	#[inline]
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		// Look ma, no heap allocations!
-		let mut out = [(); N].map(|_| mem::MaybeUninit::uninit());
-		for out in out.iter_mut() {
-			out.write(reader.read()?);
-		}
-		Ok(out.map(|v| unsafe { v.assume_init() }))
-	}
-	#[inline]
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		T::bsp_struct_size(ctx) * N
-	}
-}
-
-/// A value in a BSP file where its size differs between formats.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspVariableValue<BSP2, BSP29>(pub BSP2, #[cfg_attr(feature = "bevy_reflect", reflect(ignore))] PhantomData<BSP29>);
-impl<BSP2, BSP29> BspVariableValue<BSP2, BSP29> {
-	pub fn new(value: BSP2) -> Self {
-		Self(value, PhantomData)
-	}
-}
-impl<BSP2: BspValue, BSP29: BspValue + Into<BSP2>> BspValue for BspVariableValue<BSP2, BSP29> {
-	#[inline]
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		match reader.ctx.format {
-			BspFormat::BSP2 => reader.read().map(Self::new),
-			BspFormat::BSP29 => Ok(Self::new(BSP29::bsp_parse(reader)?.into())),
-		}
-	}
-	#[inline]
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		match ctx.format {
-			BspFormat::BSP2 => BSP2::bsp_struct_size(ctx),
-			BspFormat::BSP29 => BSP29::bsp_struct_size(ctx),
-		}
-	}
-}
-impl<BSP2, BSP29> Deref for BspVariableValue<BSP2, BSP29> {
-	type Target = BSP2;
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-impl<BSP2, BSP29> DerefMut for BspVariableValue<BSP2, BSP29> {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.0
-	}
-}
-impl<BSP2: std::fmt::Debug, BSP29: std::fmt::Debug> std::fmt::Debug for BspVariableValue<BSP2, BSP29> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.fmt(f)
-	}
-}
-impl<BSP2: std::fmt::Display, BSP29: std::fmt::Display> std::fmt::Display for BspVariableValue<BSP2, BSP29> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.fmt(f)
-	}
-}
-
-/// An unsigned variable integer parsed from a BSP. u32 when parsing BSP2, u16 when parsing BSP29.
-pub type UBspValue = BspVariableValue<u32, u16>;
-/// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
-pub type IBspValue = BspVariableValue<i32, i16>;
-
-#[derive(BspValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct PlanarTextureProjection {
-	pub u_axis: Vec3,
-	pub u_offset: f32,
-
-	pub v_axis: Vec3,
-	pub v_offset: f32,
-}
-impl PlanarTextureProjection {
-	/// Projects a position onto this plane.
-	///
-	/// Converts to double for calculation to minimise floating-point imprecision as demonstrated [here](https://github.com/Novum/vkQuake/blob/b6eb0cf5812c09c661d51e3b95fc08d88da2288a/Quake/gl_model.c#L1315).
-	pub fn project(&self, point: Vec3) -> Vec2 {
-		dvec2(
-			point.as_dvec3().dot(self.u_axis.as_dvec3()) + self.u_offset as f64,
-			point.as_dvec3().dot(self.v_axis.as_dvec3()) + self.v_offset as f64,
-		)
-		.as_vec2()
-	}
-}
-
-/// A variable length array in the format of `N` (count) then `[T; N]` (elements).
-#[derive(Debug, Clone, Default, derive_more::Deref, derive_more::DerefMut, derive_more::IntoIterator)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspVariableArray<T, N> {
-	#[deref]
-	#[deref_mut]
-	#[into_iterator(owned, ref, ref_mut)]
-	pub inner: Vec<T>,
-	#[cfg_attr(feature = "bevy_reflect", reflect(ignore))]
-	_marker: PhantomData<N>,
-}
-impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue for BspVariableArray<T, N> {
-	#[track_caller] // Just in case this unwrap fails, almost certainly not needed.
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		let count: usize = reader.read::<N>().job("count")?.try_into().unwrap();
-		let mut inner = Vec::with_capacity(count);
-
-		for _ in 0..count {
-			inner.push(reader.read().job(std::any::type_name::<T>())?);
-		}
-
-		Ok(Self { inner, _marker: PhantomData })
-	}
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		unimplemented!("{} is of variable size", std::any::type_name::<Self>());
-	}
-}
-
-/// Fixed-sized UTF-8 string. Zero-padded.
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-pub struct FixedStr<const N: usize> {
-	data: [u8; N],
-}
-impl<const N: usize> BspValue for FixedStr<N> {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		let data = reader.read()?;
-		Self::new(data).map_err(BspParseError::map_utf8_error(&data))
-	}
-	#[inline]
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		N
-	}
-}
-impl<const N: usize> FixedStr<N> {
-	pub fn new(mut data: [u8; N]) -> Result<Self, std::str::Utf8Error> {
-		// Clear any garbage after the '\0' terminator.
-		if let Some(index) = data.iter().position(|b| *b == 0) {
-			data[index..].fill(0);
-		}
-		std::str::from_utf8(&data)?;
-		Ok(Self { data })
-	}
-
-	pub fn as_str(&self) -> &str {
-		// SAFETY: This is checked when a FixedStr is created
-		unsafe { std::str::from_utf8_unchecked(&self.data) }.trim_end_matches('\0')
-	}
-}
-impl<const N: usize> std::fmt::Debug for FixedStr<N> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-impl<const N: usize> std::fmt::Display for FixedStr<N> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.as_str().fmt(f)
-	}
-}
-impl<const N: usize> FromStr for FixedStr<N> {
-	type Err = ();
-
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		if s.len() > N {
-			return Err(());
-		}
-		let mut data = [0; N];
-
-		#[allow(clippy::manual_memcpy)]
-		for i in 0..s.len() {
-			data[i] = s.as_bytes()[i];
-		}
-
-		Ok(Self { data })
-	}
-}
-#[cfg(feature = "serde")]
-impl<const N: usize> Serialize for FixedStr<N> {
-	fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-		serializer.serialize_str(self.as_str())
-	}
-}
-#[cfg(feature = "serde")]
-impl<'de, const N: usize> Deserialize<'de> for FixedStr<N> {
-	fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-		struct DataVisitor<const N: usize>;
-		impl<const N: usize> de::Visitor<'_> for DataVisitor<N> {
-			type Value = [u8; N];
-			fn expecting(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-				write!(fmt, "Fixed string of len {N}")
-			}
-
-			fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-				v.as_bytes()
-					.try_into()
-					.map_err(|_| E::custom(format_args!("string was of len {}, when max len is {N}", v.len())))
-			}
-		}
-
-		// `visit_str` ensures the string is valid
-		Ok(Self {
-			data: deserializer.deserialize_seq(DataVisitor::<N>)?,
-		})
-	}
-}
-
-#[derive(BspValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BoundingBox {
-	pub min: Vec3,
-	pub max: Vec3,
-}
-#[derive(BspValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ShortBoundingBox {
-	pub min: U16Vec3,
-	pub max: U16Vec3,
-}
-impl From<ShortBoundingBox> for BoundingBox {
-	fn from(value: ShortBoundingBox) -> Self {
-		Self {
-			min: value.min.as_vec3(),
-			max: value.max.as_vec3(),
-		}
-	}
-}
-
-/// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
-pub type VariableBoundingBox = BspVariableValue<BoundingBox, ShortBoundingBox>;
 
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -371,52 +46,111 @@ impl LumpEntry {
 			Ok(&data[from..to])
 		}
 	}
+
+	/// If `true`, this lump contains no data.
+	pub fn is_empty(&self) -> bool {
+		self.len == 0
+	}
 }
+
+/// A `LumpEntry` that doesn't exist for BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(LumpEntry)]
+#[bsp29(LumpEntry)]
+#[bsp30(LumpEntry)]
+#[bsp38(NoField)]
+pub struct PreBsp38LumpEntry(Option<LumpEntry>);
+
+/// A `LumpEntry` that only exists for BSP38.
+#[derive(BspVariableValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(NoField)]
+#[bsp29(NoField)]
+#[bsp30(NoField)]
+#[bsp38(LumpEntry)]
+pub struct Bsp38OnlyLumpEntry(Option<LumpEntry>);
 
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LumpDirectory {
+	/// String entity key/value map.
 	pub entities: LumpEntry,
+	/// Planes map for splitting the BSP tree.
 	pub planes: LumpEntry,
-	pub textures: LumpEntry,
+	/// Embedded textures (not used for Quake 2).
+	pub textures: PreBsp38LumpEntry,
+	/// Mesh vertices for each leaf.
 	pub vertices: LumpEntry,
+	/// Visdata (cluster-based for Quake 2, leaf-basd for other formats).
 	pub visibility: LumpEntry,
+	/// Non-leaf nodes in the BSP tree.
 	pub nodes: LumpEntry,
+	/// Texture info.
 	pub tex_info: LumpEntry,
+	/// Faces of each mesh.
 	pub faces: LumpEntry,
+	/// Lightmap data.
 	pub lighting: LumpEntry,
-	pub clip_nodes: LumpEntry,
+	/// Clip nodes. Not used for Quake 2, as it does collision using `leaf_brushes` and doesn't
+	/// have a concept of clip hulls.
+	pub clip_nodes: PreBsp38LumpEntry,
+	/// Leaf nodes in the BSP tree.
 	pub leaves: LumpEntry,
+	/// Leaves use this to index into the face lump.
 	pub mark_surfaces: LumpEntry,
+	/// Leaf brushes, for Quake 2 BSP collision checks.
+	pub leaf_brushes: Bsp38OnlyLumpEntry,
 	pub edges: LumpEntry,
 	pub surf_edges: LumpEntry,
 	pub models: LumpEntry,
+	pub brushes: Bsp38OnlyLumpEntry,
+	pub brush_sides: Bsp38OnlyLumpEntry,
+	/// This field is unused in Quake 2, and it's unclear what its intention is.
+	/// We need to include it anyway though, otherwise areas and area portals
+	/// won't parse correctly.
+	pub pop: Bsp38OnlyLumpEntry,
+	pub areas: Bsp38OnlyLumpEntry,
+	pub area_portals: Bsp38OnlyLumpEntry,
 
-	pub bspx: BspxDirectory,
+	pub bspx: bspx::BspxDirectory,
 }
 impl LumpDirectory {
-	pub fn bsp_entries(&self) -> [LumpEntry; 15] {
+	/// Does not include `bspx`, as this method is used to calculate the offset
+	/// to the BSPX lump.
+	pub fn bsp_entries(&self) -> impl Iterator<Item = LumpEntry> {
 		[
-			self.entities,
-			self.planes,
-			self.textures,
-			self.vertices,
-			self.visibility,
-			self.nodes,
-			self.tex_info,
-			self.faces,
-			self.lighting,
-			self.clip_nodes,
-			self.leaves,
-			self.mark_surfaces,
-			self.edges,
-			self.surf_edges,
-			self.models,
+			Some(self.entities),
+			Some(self.planes),
+			*self.textures,
+			Some(self.vertices),
+			Some(self.visibility),
+			Some(self.nodes),
+			Some(self.tex_info),
+			Some(self.faces),
+			Some(self.lighting),
+			*self.clip_nodes,
+			Some(self.leaves),
+			Some(self.mark_surfaces),
+			*self.leaf_brushes,
+			Some(self.edges),
+			Some(self.surf_edges),
+			Some(self.models),
+			*self.brushes,
+			*self.brush_sides,
+			*self.pop,
+			*self.areas,
+			*self.area_portals,
 		]
+		.into_iter()
+		.flatten()
 	}
 }
+
 impl BspValue for LumpDirectory {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let mut dir = Self {
@@ -432,19 +166,30 @@ impl BspValue for LumpDirectory {
 			clip_nodes: reader.read().job("Reading clip_nodes entry")?,
 			leaves: reader.read().job("Reading leaves entry")?,
 			mark_surfaces: reader.read().job("Reading mark_surfaces entry")?,
+			leaf_brushes: reader.read().job("Reading leaf brushes entry")?,
 			edges: reader.read().job("Reading edges entry")?,
 			surf_edges: reader.read().job("Reading surf_edges entry")?,
 			models: reader.read().job("Reading models entry")?,
+			brushes: reader.read().job("Reading brushes entry")?,
+			brush_sides: reader.read().job("Reading brush_sides entry")?,
+			pop: reader.read().job("Reading pop entry")?,
+			areas: reader.read().job("Reading areas entry")?,
+			area_portals: reader.read().job("Reading area_portals entry")?,
 
-			bspx: BspxDirectory::default(),
+			bspx: bspx::BspxDirectory::default(),
 		};
 
-		// TODO why subtract 4??
-		let bspx_offset = dir.bsp_entries().into_iter().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
-		match reader.with_pos(bspx_offset as usize).read() {
-			Ok(bspx_dir) => dir.bspx = bspx_dir,
-			Err(BspParseError::NoBspxDirectory) => {}
-			Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
+		// BSP30/BSP38 never have BSPX dir.
+		if [BspFormat::BSP29, BspFormat::BSP2].contains(&reader.ctx.format) {
+			// TODO why subtract 4??
+			// > Probably the magic number
+			let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
+
+			match reader.with_pos(bspx_offset as usize).read() {
+				Ok(bspx_dir) => dir.bspx = bspx_dir,
+				Err(BspParseError::NoBspxDirectory) => {}
+				Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
+			}
 		}
 
 		Ok(dir)
@@ -452,15 +197,4 @@ impl BspValue for LumpDirectory {
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 		unimplemented!("LumpDirectory is of variable size")
 	}
-}
-
-#[test]
-fn fixed_str_from_str() {
-	assert!(FixedStr::<8>::from_str("12345678").is_ok());
-	assert!(FixedStr::<8>::from_str("123456789").is_err());
-}
-
-#[test]
-fn fixed_str_from_null_garbage() {
-	assert!(FixedStr::<8>::new([b'+', b's', b'k', b'y', 0, b'+', b'v', 189]).is_ok());
 }
