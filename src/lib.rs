@@ -133,6 +133,7 @@ impl<T> BspParseResultDoingJobExt for BspResult<T> {
 	}
 }
 
+/// The format of a BSP file. This is determined by the magic number made up of the first 4 bytes of the file, and governs how the rest of the file attempts to parse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
