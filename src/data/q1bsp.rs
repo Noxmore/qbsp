@@ -7,7 +7,7 @@ use crate::{
 	*,
 };
 
-pub use idtech2::{BspEdge, BspFace};
+pub use idtech2::{BspEdge, BspFace, LightmapStyle};
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
