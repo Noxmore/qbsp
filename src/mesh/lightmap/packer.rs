@@ -3,9 +3,15 @@ use std::collections::HashMap;
 use glam::{uvec2, UVec2};
 use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
 
+use super::ComputeLightmapSettings;
+
 use crate::{
+	data::{
+		lighting::{BspLighting, LightmapStyle},
+		models::BspFace,
+		texture::BspTexInfo,
+	},
 	mesh::lightmap::{ComputeLightmapAtlasError, LightmapAtlas, LightmapInfo, PerSlotLightmapData, PerStyleLightmapData},
-	prelude::{BspFace, BspLighting, BspTexInfo, ComputeLightmapSettings, LightmapStyle},
 	util::Rect,
 	BspData,
 };

@@ -17,6 +17,16 @@ pub mod texture;
 pub mod util;
 pub mod visdata;
 
+// Re-exports for convenience and to reduce the load of refactoring when upgrading.
+pub use self::{
+	bspx::{BspxData, ModelBrush, ModelBrushPlane, ModelBrushes},
+	lighting::{BspLighting, LightmapOffset, LightmapStyle},
+	models::{BspEdge, BspFace, BspModel},
+	nodes::{BspClipNode, BspLeaf, BspNode, BspNodeRef, BspPlane},
+	texture::{BspMipTexture, BspTexInfo, Palette},
+	visdata::BspVisData,
+};
+
 /// Points to the chunk of data in the file a lump resides in.
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]

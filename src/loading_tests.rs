@@ -1,4 +1,8 @@
-use crate::prelude::*;
+use crate::{
+	data::{lighting::BspLighting, nodes::BspNodeRef},
+	prelude::*,
+	BspFormat,
+};
 
 #[derive(Clone, Copy)]
 pub struct TestingBsp {

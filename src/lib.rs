@@ -32,8 +32,12 @@ use thiserror::Error;
 use crate::{
 	data::{
 		bspx::BspxData,
-		texture::Palette,
+		lighting::BspLighting,
+		models::{BspEdge, BspFace, BspModel},
+		nodes::{BspClipNode, BspLeaf, BspNode, BspPlane},
+		texture::{BspMipTexture, BspTexInfo, Palette},
 		util::{NoField, UBspValue},
+		visdata::BspVisData,
 		LumpDirectory, LumpEntry,
 	},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
