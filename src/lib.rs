@@ -44,8 +44,6 @@ use crate::{
 	util::display_magic_number,
 };
 
-use crate::prelude::*;
-
 /// The default quake palette.
 pub static QUAKE_PALETTE: Palette = unsafe { mem::transmute_copy(include_bytes!("../palette.lmp")) };
 
