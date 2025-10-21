@@ -11,6 +11,9 @@ use crate::{
 	BspParseError, BspParseResultDoingJobExt, BspResult,
 };
 
+/// [`BspValue`] implementor that always returns `Ok(NoField)`, and has 0 size, effectively a NO-OP.
+///
+/// This is used for [`BspVariableValue`] implementors, where certain BSP formats don't have the information at all.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
