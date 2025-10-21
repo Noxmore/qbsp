@@ -1,8 +1,18 @@
 //! Turning [`BspData`] into a renderable mesh.
 
-pub mod lightmap;
+use std::collections::HashMap;
 
-use crate::*;
+use glam::{vec2, IVec2, UVec2, Vec2, Vec3};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::{
+	data::{bspx::DecoupledLightmap, models::BspFace, texture::BspTexFlags},
+	util::Rect,
+	BspData,
+};
+
+pub mod lightmap;
 
 /// A mesh exported from a BSP file for rendering.
 #[derive(Debug, Clone, Default)]
@@ -37,7 +47,7 @@ impl BspData {
 	//      Also, support PVS data.
 
 	/// Meshes a model at the specified index. Returns one mesh for each texture used in the model.
-	pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&LightmapUvMap>) -> MeshModelOutput {
+	pub fn mesh_model(&self, model_idx: usize, lightmap_uvs: Option<&lightmap::LightmapUvMap>) -> MeshModelOutput {
 		let model = &self.models[model_idx];
 
 		// Group faces by texture, also storing index for packing use
@@ -131,6 +141,7 @@ pub struct FaceExtents {
 
 	precomputed_uv_snap: bool,
 }
+
 impl FaceExtents {
 	/// Calculates face extents from unscaled UVs.
 	pub fn new(uvs: impl IntoIterator<Item = Vec2>) -> Self {

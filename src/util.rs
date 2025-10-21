@@ -1,5 +1,7 @@
 use std::{ops::Range, slice::Iter};
 
+use glam::Vec2;
+
 use crate::*;
 
 // Simple generic rectangle type.
@@ -163,7 +165,7 @@ pub(crate) fn potentially_visible_leaf_indices(vis_data: &[u8], num_leaves: usiz
 
 #[cfg(test)]
 mod test {
-	use crate::potentially_visible_leaf_indices;
+	use crate::util::potentially_visible_leaf_indices;
 
 	const TEST_VISDATA: &[u8] = &[0b1010_0111, 0, 5, 0b0000_0001, 0b0001_0000, 0, 12, 0b1000_0000];
 

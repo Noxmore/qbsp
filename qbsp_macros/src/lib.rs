@@ -109,7 +109,15 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 				(
 					quote! {
 						Ok(Self {
-							#(#field_names: BspValue::bsp_parse(reader).job(concat!("Reading field \"", stringify!(#field_names), "\" on type ", stringify!(#ident)))?,)*
+							#(
+								#field_names: BspValue::bsp_parse(reader)
+									.job(concat!(
+										"Reading field \"",
+										 stringify!(#field_names),
+										 "\" on type ",
+										 stringify!(#ident)
+									))?,
+							)*
 						})
 					},
 					quote! { #(<#types as BspValue>::bsp_struct_size(ctx) + )* 0 },

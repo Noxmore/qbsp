@@ -1,10 +1,15 @@
 #![doc = include_str!("../readme.md")]
 
+#[cfg(feature = "bevy_reflect")]
+use bevy_reflect::Reflect;
+use glam::Vec3;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 pub mod prelude;
-pub(crate) use prelude::*;
+use std::mem;
 
 pub mod data;
-pub(crate) use data::{bspx::*, q1bsp::*, *};
 
 #[cfg(feature = "meshing")]
 pub mod mesh;
@@ -12,13 +17,30 @@ pub mod mesh;
 #[cfg(test)]
 pub mod loading_tests;
 pub mod query;
+pub mod reader;
 pub mod util;
+
+pub use data::bspx;
 
 // Re-exports
 pub use glam;
 pub use image;
-pub use qbsp_macros::*;
+pub use qbsp_macros::{BspValue, BspVariableValue};
 pub use smallvec;
+use thiserror::Error;
+
+use crate::{
+	data::{
+		bspx::BspxData,
+		texture::Palette,
+		util::{NoField, UBspValue},
+		LumpDirectory, LumpEntry,
+	},
+	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
+	util::display_magic_number,
+};
+
+use crate::prelude::*;
 
 /// The default quake palette.
 pub static QUAKE_PALETTE: Palette = unsafe { mem::transmute_copy(include_bytes!("../palette.lmp")) };
@@ -125,6 +147,18 @@ pub enum BspFormat {
 	BSP38,
 }
 
+// This is _not_ how you parse this from a magic number - this is so that `BspValue`-deriving
+// types can easily embed the format used to parse them.
+impl BspValue for BspFormat {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		Ok(reader.ctx.format)
+	}
+
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		0
+	}
+}
+
 impl BspFormat {
 	pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
 		match &data {
@@ -158,45 +192,6 @@ impl std::fmt::Display for BspFormat {
 #[bsp38(u32)]
 pub struct BspVersion(Option<u32>);
 
-#[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspParseContext {
-	pub format: BspFormat,
-}
-
-/// An Id Tech 1 palette to use for embedded images.
-#[repr(C)] // Because we transmute data with QUAKE_PALETTE, don't want Rust to pull any shenanigans
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Palette {
-	#[cfg_attr(feature = "serde", serde(with = "serde_big_array::BigArray"))]
-	pub colors: [[u8; 3]; 256],
-}
-impl Default for Palette {
-	fn default() -> Self {
-		QUAKE_PALETTE.clone()
-	}
-}
-impl Palette {
-	/// Parses a palette from data. Palettes must be 768 bytes in length exactly.
-	pub fn parse(data: &[u8]) -> BspResult<Self> {
-		if data.len() != 768 {
-			return Err(BspParseError::InvalidPaletteLength(data.len()));
-		}
-
-		Ok(Self {
-			colors: data
-				.chunks_exact(3)
-				.map(|col| [col[0], col[1], col[2]])
-				.collect::<Vec<_>>()
-				.try_into()
-				.unwrap(),
-		})
-	}
-}
-
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
 pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
 	let lump_data = entry.get(data)?;
@@ -218,6 +213,23 @@ pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static
 	Ok(out)
 }
 
+/// The texture lump is more complex than just a vector of the same type of item, so it needs its own function.
+pub fn read_mip_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option<BspMipTexture>>> {
+	let mut textures = Vec::new();
+	let num_mip_textures: u32 = reader.read()?;
+
+	for _ in 0..num_mip_textures {
+		let offset: i32 = reader.read()?;
+		if offset.is_negative() {
+			textures.push(None);
+			continue;
+		}
+		textures.push(Some(BspMipTexture::bsp_parse(&mut reader.with_pos(offset as usize))?));
+	}
+
+	Ok(textures)
+}
+
 /// A BSP files contents parsed into structures for easy access.
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -233,12 +245,11 @@ pub struct BspData {
 	pub textures: Vec<Option<BspMipTexture>>,
 	/// All vertex positions.
 	pub vertices: Vec<Vec3>,
-	/// RLE encoded bit array.
+	/// RLE encoded bit array. For BSP38, this is cluster-based. For BSP29, BSP2 and BSP30 this is leaf-based,
+	/// and models will have their own indices into the visdata array.
 	///
 	/// See [the specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4) for more info.
-	///
-	/// TODO in the future, this crate might support visibility operations
-	pub visibility: Vec<u8>,
+	pub visibility: BspVisData,
 	pub nodes: Vec<BspNode>,
 	pub tex_info: Vec<BspTexInfo>,
 	pub faces: Vec<BspFace>,
@@ -265,20 +276,6 @@ pub struct BspData {
 
 	/// Additional information from the BSP parsed. For example, contains the [BspFormat] of the file.
 	pub parse_ctx: BspParseContext,
-}
-
-/// Offsets for each
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct BspVisDataOffsets {
-	/// Index into `visibility` where the potentially visible set starts.
-	pub pvs: u32,
-	/// Index into `visibility` where the potentially audible set starts.
-	pub phs: Option<u32>,
-}
-
-pub struct BspVisData {
-	pub cluster_offsets: BspVisDataOffsets,
-	pub visibility: Vec<u8>,
 }
 
 impl BspData {
@@ -330,36 +327,19 @@ impl BspData {
 			} else {
 				vec![]
 			},
-			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx)?,
-			visibility: lump_dir.visibility.get(bsp)?.to_vec(),
+			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx).job("vertices")?,
+			visibility: BspByteReader::new(lump_dir.visibility.get(bsp)?, &ctx).read().job("visibiliy")?,
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
 			lighting: if let Some(lit) = lit {
 				Some(BspLighting::read_lit(lit, &ctx, false).job("Parsing .lit file")?)
-			} else if let Some(lighting) = {
-				if settings.use_bspx_rgb_lighting {
-					bspx.parse_rgb_lighting(&ctx)
-				} else {
-					None
-				}
-			} {
-				Some(lighting?)
+			} else if let Some(lighting) = bspx.parse_rgb_lighting(&ctx).transpose()?.filter(|_| settings.use_bspx_rgb_lighting) {
+				Some(lighting)
+			} else if !lump_dir.lighting.is_empty() {
+				Some(BspByteReader::new(lump_dir.lighting.get(bsp)?, &ctx).read()?)
 			} else {
-				let lighting = lump_dir.lighting.get(bsp)?;
-
-				if lighting.is_empty() {
-					None
-				} else if ctx.format == BspFormat::BSP29 {
-					Some(BspLighting::White(lighting.to_vec()))
-				} else {
-					let (rgb_pixels, rest) = lighting.as_chunks::<3>();
-					if !rest.is_empty() {
-						return Err(BspParseError::ColorDataSizeNotDevisableBy3(lighting.len()));
-					}
-
-					Some(BspLighting::Colored(rgb_pixels.to_vec()))
-				}
+				None
 			},
 			clip_nodes: if let Some(clip_node_lump) = *lump_dir.clip_nodes {
 				read_lump(bsp, clip_node_lump, "clip nodes", &ctx)?

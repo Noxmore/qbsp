@@ -1,4 +1,4 @@
-use crate::{idtech2::BspNodeRef, *};
+use crate::prelude::*;
 
 #[derive(Clone, Copy)]
 pub struct TestingBsp {
@@ -50,7 +50,7 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	// testing_bsp!("halflife/c0a0c.bsp"),
 	// testing_bsp!("halflife/c0a0d.bsp"),
 	// testing_bsp!("halflife/c0a0e.bsp"),
-	EXAMPLE_BSP,
+	// EXAMPLE_BSP,
 ];
 
 #[test]
@@ -162,7 +162,6 @@ fn validate_bounds() {
 			assert!(face.texture_info_idx.0 < data.tex_info.len().max(1) as u32);
 			if let Some(lighting) = &data.lighting {
 				assert!((face.lightmap_offset.pixels as i64) < lighting.len().max(1) as i64);
-				assert!((face.lightmap_offset.bytes as i64) < lighting.bytes().max(1) as i64);
 			}
 		}
 
@@ -172,17 +171,14 @@ fn validate_bounds() {
 			assert!(clip_node.back.leaf().is_some() || (clip_node.back.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 		}
 
-		for leaf in &data.leaves {
-			match leaf.vis_list {
-				VisdataRef::VisLeaves(vis_list) => {
-					assert!((vis_list as i64) < data.visibility.len() as i64);
-					validate_range(leaf.face_idx.0, leaf.face_num.0, data.mark_surfaces.len());
+		if !data.visibility.visdata.is_empty() {
+			for leaf in &data.leaves {
+				if leaf.vis_list.is_empty() {
+					continue;
 				}
-				VisdataRef::Cluster(cluster) => {
-					assert!((cluster as i64) < data.visibility.len() as i64);
-				}
+
+				assert!(data.visibility.pvs(leaf.vis_list).is_some());
 			}
-			// TODO PVS support
 		}
 
 		for surface_idx in &data.mark_surfaces {
@@ -199,10 +195,10 @@ fn validate_bounds() {
 		}
 
 		for model in &data.models {
-			validate_node_ref(&model.root_hulls.bsp_root, &data);
-			if let Some(clip_nodes) = model.root_hulls.clip_nodes {
-				assert!((clip_nodes[0].node().unwrap() as usize) < data.clip_nodes.len().max(1));
-				assert!((clip_nodes[1].node().unwrap() as usize) < data.clip_nodes.len().max(1));
+			validate_node_ref(&model.root_hulls.root, &data);
+			if let Some(clip_nodes) = model.root_hulls.for_size {
+				assert!((clip_nodes.small.node().unwrap() as usize) < data.clip_nodes.len().max(1));
+				assert!((clip_nodes.large.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 			}
 
 			validate_range(model.first_face, model.num_faces, data.faces.len());

@@ -1,0 +1,156 @@
+#[cfg(feature = "bevy_reflect")]
+use bevy_reflect::Reflect;
+use qbsp_macros::{BspValue, BspVariableValue};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+use crate::{
+	data::util::NoField,
+	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
+	BspParseResultDoingJobExt, BspResult,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum VisdataRef {
+	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
+	Cluster(i16),
+	/// Most IDTech2 formats store visdata on a per-leaf basis.
+	Leaf(i32),
+}
+
+impl VisdataRef {
+	/// If the inner value is `-1`, this leaf's visdata is invalid.
+	pub fn is_empty(&self) -> bool {
+		match *self {
+			VisdataRef::Cluster(val) => val == -1,
+			VisdataRef::Leaf(val) => val == -1,
+		}
+	}
+}
+
+impl BspVariableValue for VisdataRef {
+	type Bsp29 = i32;
+	type Bsp2 = i32;
+	type Bsp30 = i32;
+	type Bsp38 = i16;
+}
+
+impl From<i16> for VisdataRef {
+	fn from(value: i16) -> Self {
+		Self::Cluster(value)
+	}
+}
+
+impl From<i32> for VisdataRef {
+	fn from(value: i32) -> Self {
+		Self::Leaf(value)
+	}
+}
+
+/// Offsets for each of the potentially-visible set and potentially-audible set.
+#[derive(BspValue, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspClusterOffsets {
+	/// Index into `BspVisData.visibility` where the potentially visible set starts.
+	pub pvs: u32,
+	/// Index into `BspVisData.visibility` where the potentially audible set starts.
+	pub phs: u32,
+}
+
+impl BspValue for Vec<BspClusterOffsets> {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let num_clusters: u32 = reader.read()?;
+
+		let mut out = Vec::with_capacity(num_clusters as usize);
+
+		for _ in 0..num_clusters {
+			out.push(reader.read()?);
+		}
+
+		Ok(out)
+	}
+
+	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+		// Not meaningful for this type, but since `BspValue` requires this, we supply a minimum size.
+		u32::bsp_struct_size(ctx)
+	}
+}
+
+#[derive(BspVariableValue, Default, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[bsp2(NoField)]
+#[bsp29(NoField)]
+#[bsp30(NoField)]
+#[bsp38(Vec<BspClusterOffsets>)]
+pub struct BspVisDataOffsets(pub Option<Vec<BspClusterOffsets>>);
+
+/// The visiblity lump - for pre-BSP38 files, this is just a flat byte vector. For BSP38,
+/// this includes a header describing where in the bytes to find the PVS and PHS (see
+/// `BspClusterOffsets`).
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BspVisData {
+	/// For BSP38, the offsets into the visibility bytes that the PVS and PHS can be found at.
+	pub vis_data_offsets: BspVisDataOffsets,
+	pub visdata: Vec<u8>,
+}
+
+impl BspVisData {
+	pub fn pvs(&self, vis_ref: VisdataRef) -> Option<&[u8]> {
+		match vis_ref {
+			VisdataRef::Cluster(cluster) => {
+				let offsets = self.vis_data_offsets.as_ref()?;
+
+				let BspClusterOffsets { pvs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
+
+				self.visdata.get(*pvs as usize..)
+			}
+			VisdataRef::Leaf(vis_leaf) => {
+				if self.vis_data_offsets.is_some() {
+					return None;
+				}
+
+				self.visdata.get(usize::try_from(vis_leaf).ok()?..)
+			}
+		}
+	}
+
+	pub fn phs(&self, vis_ref: VisdataRef) -> Option<&[u8]> {
+		match vis_ref {
+			VisdataRef::Cluster(cluster) => {
+				let offsets = self.vis_data_offsets.as_ref()?;
+
+				let BspClusterOffsets { phs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
+
+				self.visdata.get(*phs as usize..)
+			}
+			VisdataRef::Leaf(vis_leaf) => {
+				if self.vis_data_offsets.is_some() {
+					return None;
+				}
+
+				self.visdata.get(usize::try_from(vis_leaf).ok()?..)
+			}
+		}
+	}
+}
+
+impl BspValue for BspVisData {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let vis_data_offsets = reader.read()?;
+
+		Ok(Self {
+			vis_data_offsets,
+			visdata: reader.read_rest().to_vec(),
+		})
+	}
+
+	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+		BspVisDataOffsets::bsp_struct_size(ctx)
+	}
+}

@@ -1,8 +1,14 @@
-use super::*;
-use crate::*;
-use idtech2::LightmapStyle;
+use std::collections::HashMap;
 
+use glam::{uvec2, UVec2};
 use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
+
+use crate::{
+	mesh::lightmap::{ComputeLightmapAtlasError, LightmapAtlas, LightmapInfo, PerSlotLightmapData, PerStyleLightmapData},
+	prelude::{BspFace, BspLighting, BspTexInfo, ComputeLightmapSettings, LightmapStyle},
+	util::Rect,
+	BspData,
+};
 
 /// A trait for packing lightmaps into texture atlas'. Specifically using image::RgbImage.
 pub trait LightmapPacker {

@@ -1,8 +1,20 @@
-mod packer;
-pub use packer::*;
+use std::collections::HashMap;
 
-use super::*;
-use crate::{idtech2::LightmapStyle, *};
+use glam::{uvec2, UVec2, Vec2};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use smallvec::{smallvec, SmallVec};
+use thiserror::Error;
+
+mod packer;
+
+pub use packer::{DefaultLightmapPacker, LightmapPacker, LightmapPackerFaceView, PerSlotLightmapPacker, PerStyleLightmapPacker};
+
+use crate::{
+	data::{lighting::LightmapStyle, texture::BspTexFlags},
+	mesh::FaceExtents,
+	BspData, BspParseError,
+};
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
