@@ -206,7 +206,7 @@ pub struct LightmapInfo {
 	pub lightmap_offset: i32,
 }
 impl LightmapInfo {
-	/// Computes the index into [`BspLighting`] for the specific face specified. Assumes [`lightmap_offset`](Self::lightmap_offset) is positive.
+	/// Computes the index into [`BspLighting`](crate::data::lighting::BspLighting) for the specific face specified. Assumes [`lightmap_offset`](Self::lightmap_offset) is positive.
 	#[inline]
 	pub fn compute_lighting_index(&self, light_style_idx: usize, x: u32, y: u32) -> usize {
 		self.lightmap_offset as usize

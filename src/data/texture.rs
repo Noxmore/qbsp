@@ -244,7 +244,7 @@ impl BspValue for BspSurfaceFlags {
 pub struct BspTexExtraInfo {
 	/// Texture brightness - 255 is "normal" brightness (should display the same as Quake 1),
 	/// higher is emissive, lower is darker. To get this as a floating-point number, see
-	/// [`BspTexInfo::brightness`].
+	/// [`BspTexExtraInfo::brightness`].
 	pub value: u32,
 
 	/// The name of the texture.

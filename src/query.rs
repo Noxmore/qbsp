@@ -87,7 +87,7 @@ impl BspData {
 
 	/// Get the potentially visible set of the leaf with index `leaf_idx`. These are the maximum set of leaves
 	/// that could ever be visible from this leaf. Depending on format, this will either be expressed as a set
-	/// of leaf indices ([`VisdataRef::Leaf`]), or a cluster ([`VisdataRef::Cluster`]). In the latter case, you
+	/// of leaf indices ([`VisdataRef::Offset`]), or a cluster ([`VisdataRef::Cluster`]). In the latter case, you
 	/// should check the `visdata` field of [`BspLeaf`](crate::data::nodes::BspLeaf) to work out which leaves
 	/// are visible.
 	///
@@ -108,7 +108,7 @@ impl BspData {
 
 	/// Get the potentially visible set at the point `point` in the model at the index `model_idx`. These are
 	/// the maximum set of leaves that could ever be visible from this leaf. Depending on format, this will
-	/// either be expressed as a set of leaf indices ([`VisdataRef::Leaf`]), or a cluster ([`VisdataRef::Cluster`]).
+	/// either be expressed as a set of leaf indices ([`VisdataRef::Offset`]), or a cluster ([`VisdataRef::Cluster`]).
 	/// In the latter case, you should check the `visdata` field of [`BspLeaf`](crate::data::nodes::BspLeaf) to
 	/// work out which leaves are visible.
 	///

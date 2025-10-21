@@ -356,7 +356,7 @@ pub struct BspNode {
 
 	/// Bounding box of the node and all its children.
 	pub bound: BoundingBox,
-	/// Index of the first [`BspFace`] the node contains.
+	/// Index of the first [`BspFace`](crate::data::models::BspFace) the node contains.
 	pub face_idx: UBspValue,
 	/// Number of faces this node contains.
 	pub face_num: UBspValue,

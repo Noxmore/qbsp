@@ -15,7 +15,7 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum VisdataRef {
 	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
-	/// See [`BspVisData`](crate::BspVisData). The `offsets` field can be used to get the actual
+	/// See [`BspVisData`]. The `offsets` field can be used to get the actual
 	/// offsets into the visdata array.
 	Cluster(i16),
 	/// A raw offset into the visdata.
