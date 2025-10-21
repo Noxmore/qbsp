@@ -29,7 +29,7 @@ pub struct RaycastImpact {
 impl BspData {
 	/// Returns the index of the BSP leaf `point` is in of `model`.
 	pub fn leaf_at_point(&self, model_idx: usize, point: Vec3) -> usize {
-		self.leaf_at_point_in_node(self.models[model_idx].root_hulls.root, point)
+		self.leaf_at_point_in_node(self.models[model_idx].hulls.root, point)
 	}
 
 	/// Returns the index of the BSP leaf `point` is in inside a specific node. Usually, you probably want [`Self::leaf_at_point`].
@@ -168,6 +168,6 @@ impl BspData {
 			data: self,
 		};
 
-		internal(&ctx, self.models[model_idx].root_hulls.root, from, to)
+		internal(&ctx, self.models[model_idx].hulls.root, from, to)
 	}
 }

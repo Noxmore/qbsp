@@ -195,8 +195,8 @@ fn validate_bounds() {
 		}
 
 		for model in &data.models {
-			validate_node_ref(&model.root_hulls.root, &data);
-			if let Some(clip_nodes) = model.root_hulls.for_size {
+			validate_node_ref(&model.hulls.root, &data);
+			if let Some(clip_nodes) = model.hulls.for_size {
 				assert!((clip_nodes.small.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 				assert!((clip_nodes.large.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 			}

@@ -83,7 +83,7 @@ pub struct BspModel {
 	pub origin: Vec3,
 
 	/// The indices for the BSP and clip roots.
-	pub root_hulls: Hulls,
+	pub hulls: Hulls,
 
 	/// Number of visleafs, not including the out-of-bounds leaf 0. Quake uses a cluster system for visibility,
 	/// and so this field is not included.
