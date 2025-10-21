@@ -253,6 +253,8 @@ pub struct BspData {
 	/// RLE encoded bit array. For BSP38, this is cluster-based. For BSP29, BSP2 and BSP30 this is leaf-based,
 	/// and models will have their own indices into the visdata array.
 	///
+	/// Use [`potentially_visible_set_at()`](Self::potentially_visible_set_at) and related functions to query this data.
+	///
 	/// See [the specification](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4) for more info.
 	pub visibility: BspVisData,
 	pub nodes: Vec<BspNode>,

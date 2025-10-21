@@ -177,11 +177,11 @@ fn validate_bounds() {
 
 		if !data.visibility.visdata.is_empty() {
 			for leaf in &data.leaves {
-				if leaf.vis_list.is_empty() {
+				if leaf.visdata.is_empty() {
 					continue;
 				}
 
-				assert!(data.visibility.pvs(leaf.vis_list).is_some());
+				assert!(data.visibility.pvs(leaf.visdata).is_some());
 			}
 		}
 

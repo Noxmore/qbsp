@@ -15,9 +15,11 @@ use crate::{
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum VisdataRef {
 	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
+	/// See [`BspVisData`](crate::BspVisData). The `offsets` field can be used to get the actual
+	/// offsets into the visdata array.
 	Cluster(i16),
-	/// Most IDTech2 formats store visdata on a per-leaf basis.
-	Leaf(i32),
+	/// A raw offset into the visdata.
+	Offset(i32),
 }
 
 impl VisdataRef {
@@ -25,7 +27,7 @@ impl VisdataRef {
 	pub fn is_empty(&self) -> bool {
 		match *self {
 			VisdataRef::Cluster(val) => val == -1,
-			VisdataRef::Leaf(val) => val == -1,
+			VisdataRef::Offset(val) => val == -1,
 		}
 	}
 }
@@ -45,7 +47,7 @@ impl From<i16> for VisdataRef {
 
 impl From<i32> for VisdataRef {
 	fn from(value: i32) -> Self {
-		Self::Leaf(value)
+		Self::Offset(value)
 	}
 }
 
@@ -110,7 +112,7 @@ impl BspVisData {
 
 				self.visdata.get(*pvs as usize..)
 			}
-			VisdataRef::Leaf(vis_leaf) => {
+			VisdataRef::Offset(vis_leaf) => {
 				if self.vis_data_offsets.is_some() {
 					return None;
 				}
@@ -129,7 +131,7 @@ impl BspVisData {
 
 				self.visdata.get(*phs as usize..)
 			}
-			VisdataRef::Leaf(vis_leaf) => {
+			VisdataRef::Offset(vis_leaf) => {
 				if self.vis_data_offsets.is_some() {
 					return None;
 				}

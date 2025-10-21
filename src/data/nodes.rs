@@ -408,8 +408,9 @@ pub struct BspLeaf {
 
 	/// For BSP29, BSP2, and BSP30, this is an index into the `visibility` byte array where the
 	/// visdata for this leaf starts. For BSP38, this is a "cluster". Leafs with the same cluster
-	/// should be put within the same model, and
-	pub vis_list: VisdataRef,
+	/// should be put within the same model, and are considered potentially visible or not as a
+	/// group.
+	pub visdata: VisdataRef,
 
 	pub area: BspArea,
 

@@ -114,14 +114,14 @@ impl Iterator for BitsIter {
 ///
 /// Above code adapted from [Richter](https://github.com/cormac-obrien/richter/blob/506504d5f9f93dab807e61ba3cad1a27d6d5a707/src/common/bsp/mod.rs#L831-L866),
 /// itself adapted from [code by David Etherton and Tony Myles](https://www.gamers.org/dEngine/quake/spec/quake-spec34/qkspec_4.htm#BL4).
-struct VisdataIterator<'a> {
+pub struct VisdataIter<'a> {
 	vis_leaves: Range<usize>,
 	data_bytes: Iter<'a, u8>,
 	/// If `Some`, we are currently iterating over the bits in a byte.
 	cur_byte: Option<BitsIter>,
 }
 
-impl Iterator for VisdataIterator<'_> {
+impl Iterator for VisdataIter<'_> {
 	type Item = usize;
 
 	fn next(&mut self) -> Option<Self::Item> {
@@ -153,8 +153,8 @@ impl Iterator for VisdataIterator<'_> {
 /// Get an iterator of potentially-visible leaf indices (starting at 1), given a byte array of visdata.
 /// The slice should be calculated using the `vis_list` field of `BspLeaf` - if this field is positive,
 /// then it is the index to slice the `BspData`'s visdata from.
-pub(crate) fn potentially_visible_leaf_indices(vis_data: &[u8], num_leaves: usize) -> impl Iterator<Item = usize> + '_ {
-	VisdataIterator {
+pub(crate) fn calculate_visdata_indices(vis_data: &[u8], num_leaves: usize) -> VisdataIter<'_> {
+	VisdataIter {
 		// Leaf index 0 is always invalid (used to represent leaves that are out-of-bounds), so Quake
 		// doesn't even store a bit for it - counting always starts at 1
 		vis_leaves: 1..num_leaves,
@@ -165,14 +165,14 @@ pub(crate) fn potentially_visible_leaf_indices(vis_data: &[u8], num_leaves: usiz
 
 #[cfg(test)]
 mod test {
-	use crate::util::potentially_visible_leaf_indices;
+	use crate::util::calculate_visdata_indices;
 
 	const TEST_VISDATA: &[u8] = &[0b1010_0111, 0, 5, 0b0000_0001, 0b0001_0000, 0, 12, 0b1000_0000];
 
 	#[test]
 	fn test_pvs_calculation() {
 		assert_eq!(
-			potentially_visible_leaf_indices(TEST_VISDATA, 256).collect::<Vec<_>>(),
+			calculate_visdata_indices(TEST_VISDATA, 256).collect::<Vec<_>>(),
 			&[1, 2, 3, 6, 8, 49, 61, 168]
 		);
 	}
