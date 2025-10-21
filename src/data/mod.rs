@@ -63,16 +63,6 @@ impl LumpEntry {
 #[bsp38(NoField)]
 pub struct PreBsp38LumpEntry(Option<LumpEntry>);
 
-/// A `LumpEntry` that doesn't exist for BSP30 or BSP38.
-#[derive(BspVariableValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[bsp2(LumpEntry)]
-#[bsp29(LumpEntry)]
-#[bsp30(NoField)]
-#[bsp38(NoField)]
-pub struct PreBsp30LumpEntry(Option<LumpEntry>);
-
 /// A `LumpEntry` that only exists for BSP38.
 #[derive(BspVariableValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -82,16 +72,6 @@ pub struct PreBsp30LumpEntry(Option<LumpEntry>);
 #[bsp30(NoField)]
 #[bsp38(LumpEntry)]
 pub struct Bsp38OnlyLumpEntry(Option<LumpEntry>);
-
-/// A `LumpEntry` that only exists for BSP30 and BSP38.
-#[derive(BspVariableValue, Debug, Clone, Copy)]
-#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[bsp2(NoField)]
-#[bsp29(NoField)]
-#[bsp30(LumpEntry)]
-#[bsp38(LumpEntry)]
-pub struct Bsp3xLumpEntry(Option<LumpEntry>);
 
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]
