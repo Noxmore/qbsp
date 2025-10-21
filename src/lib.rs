@@ -153,18 +153,6 @@ pub enum BspFormat {
 	BSP38,
 }
 
-// This is _not_ how you parse this from a magic number - this is so that `BspValue`-deriving
-// types can easily embed the format used to parse them.
-impl BspValue for BspFormat {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		Ok(reader.ctx.format)
-	}
-
-	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
-		0
-	}
-}
-
 impl BspFormat {
 	pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
 		match &data {

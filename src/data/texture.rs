@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	data::util::{FixedStr, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspFormat, BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
+	BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 };
 
 /// An id Tech 2 palette to use for embedded images.
@@ -83,9 +83,6 @@ pub struct ExtraInfoField(pub Option<BspTexExtraInfo>);
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfo {
-	/// The format that was used to parse this type.
-	pub format: BspFormat,
-
 	pub projection: PlanarTextureProjection,
 
 	pub texture_idx: TextureIdxField,
@@ -377,9 +374,6 @@ impl BspValue for BspMipTexture {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTextureHeader {
-	/// What format was this parsed with.
-	pub format: BspFormat,
-
 	pub name: FixedStr<16>,
 
 	pub width: u32,
