@@ -23,7 +23,7 @@ pub use self::{
 	lighting::{BspLighting, LightmapOffset, LightmapStyle},
 	models::{BspEdge, BspFace, BspModel},
 	nodes::{BspClipNode, BspLeaf, BspNode, BspNodeRef, BspPlane},
-	texture::{BspMipTexture, BspTexInfo, Palette},
+	texture::{BspMipTexture, BspTexFlags, BspTexInfo, Palette},
 	visdata::BspVisData,
 };
 
