@@ -110,6 +110,53 @@ pub struct BspEdge {
 	pub b: UBspValue,
 }
 
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct LightmapOffset {
+	pub pixels: i32,
+	pub bytes: i32,
+}
+
+impl BspVariableValue for LightmapOffset {
+	type Bsp29 = Bsp29LightmapOffset;
+	type Bsp2 = Bsp29LightmapOffset;
+	type Bsp30 = Bsp3xLightmapOffset;
+	type Bsp38 = Bsp3xLightmapOffset;
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Bsp29LightmapOffset {
+	pub offset: i32,
+}
+
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct Bsp3xLightmapOffset {
+	pub offset: i32,
+}
+
+impl From<Bsp29LightmapOffset> for LightmapOffset {
+	fn from(value: Bsp29LightmapOffset) -> Self {
+		Self {
+			pixels: value.offset,
+			bytes: value.offset,
+		}
+	}
+}
+
+impl From<Bsp3xLightmapOffset> for LightmapOffset {
+	fn from(value: Bsp3xLightmapOffset) -> Self {
+		Self {
+			pixels: value.offset / 3,
+			bytes: value.offset,
+		}
+	}
+}
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -134,8 +181,10 @@ pub struct BspFace {
 	/// You can also short-circuit when looping through these styles, if `lightmap_styles[2]` is 255, there isn't a possibility that `lightmap_styles[3]` isn't.
 	pub lightmap_styles: [LightmapStyle; 4],
 
-	/// Offset of the lightmap (in bytes) in the lightmap lump, or -1 if no lightmap
-	pub lightmap_offset: i32,
+	/// Offset of the lightmap in the lightmap lump, or -1 if no lightmap.
+	///
+	/// This is stored as bytes for BSP30 and BSP38.
+	pub lightmap_offset: LightmapOffset,
 }
 
 impl BspFace {

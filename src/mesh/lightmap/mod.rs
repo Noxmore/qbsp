@@ -125,7 +125,7 @@ impl BspData {
 					LightmapInfo {
 						uvs,
 						extents,
-						lightmap_offset: face.lightmap_offset,
+						lightmap_offset: face.lightmap_offset.pixels,
 					}
 				}
 			};

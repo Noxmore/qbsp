@@ -532,6 +532,14 @@ impl BspLighting {
 	}
 
 	#[inline]
+	pub fn bytes(&self) -> usize {
+		match self {
+			Self::White(vec) => vec.len(),
+			Self::Colored(vec) => vec.len() * 3,
+		}
+	}
+
+	#[inline]
 	pub fn is_empty(&self) -> bool {
 		self.len() == 0
 	}

@@ -161,7 +161,8 @@ fn validate_bounds() {
 			validate_range(face.first_edge, face.num_edges.0, data.surface_edges.len());
 			assert!(face.texture_info_idx.0 < data.tex_info.len().max(1) as u32);
 			if let Some(lighting) = &data.lighting {
-				assert!((face.lightmap_offset as i64) < lighting.len().max(1) as i64);
+				assert!((face.lightmap_offset.pixels as i64) < lighting.len().max(1) as i64);
+				assert!((face.lightmap_offset.bytes as i64) < lighting.bytes().max(1) as i64);
 			}
 		}
 

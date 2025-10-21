@@ -350,8 +350,15 @@ impl BspData {
 
 				if lighting.is_empty() {
 					None
-				} else {
+				} else if ctx.format == BspFormat::BSP29 {
 					Some(BspLighting::White(lighting.to_vec()))
+				} else {
+					let (rgb_pixels, rest) = lighting.as_chunks::<3>();
+					if !rest.is_empty() {
+						return Err(BspParseError::ColorDataSizeNotDevisableBy3(lighting.len()));
+					}
+
+					Some(BspLighting::Colored(rgb_pixels.to_vec()))
 				}
 			},
 			clip_nodes: if let Some(clip_node_lump) = *lump_dir.clip_nodes {
