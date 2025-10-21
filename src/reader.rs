@@ -78,6 +78,15 @@ impl<'a> BspByteReader<'a> {
 	}
 
 	#[inline]
+	pub fn with_context(&'a self, ctx: &'a BspParseContext) -> Self {
+		Self {
+			ctx,
+			bytes: self.bytes,
+			pos: self.pos,
+		}
+	}
+
+	#[inline]
 	pub fn pos(&self) -> usize {
 		self.pos
 	}

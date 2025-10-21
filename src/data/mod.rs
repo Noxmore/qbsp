@@ -181,9 +181,7 @@ impl BspValue for LumpDirectory {
 
 		// BSP30/BSP38 never have BSPX dir.
 		if [BspFormat::BSP29, BspFormat::BSP2].contains(&reader.ctx.format) {
-			// TODO why subtract 4??
-			// > Probably the magic number
-			let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap() - 4;
+			let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
 
 			match reader.with_pos(bspx_offset as usize).read() {
 				Ok(bspx_dir) => dir.bspx = bspx_dir,

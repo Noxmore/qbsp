@@ -39,11 +39,11 @@ use crate::{
 		models::{BspEdge, BspFace, BspModel},
 		nodes::{BspClipNode, BspLeaf, BspNode, BspPlane},
 		texture::{BspMipTexture, BspTexInfo},
-		util::{NoField, UBspValue},
+		util::UBspValue,
 		visdata::BspVisData,
 		LumpDirectory, LumpEntry,
 	},
-	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
+	reader::{BspByteReader, BspParseContext, BspValue},
 	util::display_magic_number,
 };
 
@@ -82,6 +82,8 @@ pub enum BspParseError {
 	InvalidString { index: usize, sequence: Vec<u8> },
 	#[error("Wrong magic number! Expected {expected}, found \"{}\"", display_magic_number(found))]
 	WrongMagicNumber { found: [u8; 4], expected: &'static str },
+	#[error("Unsupported IBSP version! Expected {expected}, found {found}")]
+	UnsupportedIbspVersion { found: u32, expected: &'static str },
 	#[error("Invalid color data, size {0} is not devisable by 3!")]
 	ColorDataSizeNotDevisableBy3(usize),
 	#[error("Invalid value: {value}, acceptable:\n{acceptable}")]
@@ -153,18 +155,35 @@ pub enum BspFormat {
 	BSP38,
 }
 
-impl BspFormat {
-	pub fn from_magic_number(data: [u8; 4]) -> Result<Self, BspParseError> {
-		match &data {
+impl BspValue for BspFormat {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let magic_number: [u8; 4] = reader.read()?;
+
+		match &magic_number {
 			b"BSP2" => Ok(Self::BSP2),
 			[0x1D, 0x00, 0x00, 0x00] => Ok(Self::BSP29),
 			[0x1E, 0x00, 0x00, 0x00] => Ok(Self::BSP30),
-			b"IBSP" => Ok(Self::BSP38),
+			b"IBSP" => {
+				// "IBSP" is shared among formats, like Quake 3. Instead, it is differentiated by a version number read after the magic number.
+				let version: u32 = reader.read()?;
+				// Currently, we only support version 38, the Quake2 format.
+				match version {
+					38 => Ok(Self::BSP38),
+					_ => Err(BspParseError::UnsupportedIbspVersion {
+						found: version,
+						expected: "38 (Quake 2)",
+					}),
+				}
+			}
 			_ => Err(BspParseError::WrongMagicNumber {
-				found: data,
+				found: magic_number,
 				expected: "BSP2, 0x1D000000 (BSP29), 0x1E000000 (BSP30), or IBSP (BSP38)",
 			}),
 		}
+	}
+
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		unimplemented!("BspFormat can be of 4 or 8 bytes depending on whether it needs to read version number.");
 	}
 }
 
@@ -178,13 +197,6 @@ impl std::fmt::Display for BspFormat {
 		}
 	}
 }
-
-#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[bsp29(NoField)]
-#[bsp2(NoField)]
-#[bsp30(NoField)]
-#[bsp38(u32)]
-pub struct BspVersion(Option<u32>);
 
 /// Helper function to read an array of data of type `T` from a lump. Takes in the BSP file data, the lump directory, and the lump to read from.
 pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static str, ctx: &BspParseContext) -> BspResult<Vec<T>> {
@@ -230,7 +242,6 @@ pub fn read_mip_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspData {
 	pub format: BspFormat,
-	pub version: Option<u32>,
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.
 	/// - Brush entities have a `model` property indexing into the `models` field of this struct.
@@ -286,13 +297,12 @@ impl BspData {
 			});
 		}
 
-		let ctx = BspParseContext {
-			format: BspFormat::from_magic_number(bsp[0..4].try_into().unwrap())?,
-		};
-		let mut reader = BspByteReader::new(&bsp[4..], &ctx);
-		// For now, the version field is ignored. As a few different formats use the `IBSP` magic,
-		// we should probably check this to ensure that we can actually read it.
-		let version: BspVersion = reader.read()?;
+		// To parse the format version and form the BspParseContext, we need one with a default parse context where it won't be used.
+		let dummy_ctx = BspParseContext::default();
+		let mut reader = BspByteReader::new(bsp, &dummy_ctx);
+
+		let ctx = BspParseContext { format: reader.read()? };
+		let mut reader = reader.with_context(&ctx);
 
 		let lump_dir: LumpDirectory = reader.read()?;
 
@@ -312,7 +322,6 @@ impl BspData {
 
 		let data = Self {
 			format: ctx.format,
-			version: version.0,
 			entities: std::str::from_utf8(&entities_bytes)
 				.map_err(BspParseError::map_utf8_error(&entities_bytes))
 				.job("Reading entities lump")?

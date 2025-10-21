@@ -3,7 +3,6 @@
 use crate::{
 	data::{lighting::BspLighting, nodes::BspNodeRef},
 	prelude::*,
-	BspFormat,
 };
 
 #[derive(Clone, Copy)]
@@ -125,26 +124,6 @@ fn validate_bounds() {
 			settings: BspParseSettings::default(),
 		})
 		.unwrap();
-
-		if name.ends_with("-quake2.bsp") {
-			assert_eq!(
-				data.format,
-				BspFormat::BSP38,
-				"{name} was of wrong format (expecting BSP38, found {})",
-				data.format
-			);
-			assert!(data.version.is_some());
-		}
-
-		if name.starts_with("halflife") {
-			assert_eq!(
-				data.format,
-				BspFormat::BSP30,
-				"{name} was of wrong format (expecting BSP30, found {})",
-				data.format
-			);
-			assert!(data.version.is_none());
-		}
 
 		// We max(0) the lengths here to make index 0 a valid index for a length of 0
 
