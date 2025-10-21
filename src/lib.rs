@@ -5,6 +5,7 @@ use bevy_reflect::Reflect;
 use glam::Vec3;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 pub mod prelude;
 use std::mem;
@@ -27,7 +28,9 @@ pub use glam;
 pub use image;
 pub use qbsp_macros::{BspValue, BspVariableValue};
 pub use smallvec;
-use thiserror::Error;
+
+// Re-export since this will be one of the most-used types when configuring `qbsp`.
+pub use data::texture::Palette;
 
 use crate::{
 	data::{
@@ -35,7 +38,7 @@ use crate::{
 		lighting::BspLighting,
 		models::{BspEdge, BspFace, BspModel},
 		nodes::{BspClipNode, BspLeaf, BspNode, BspPlane},
-		texture::{BspMipTexture, BspTexInfo, Palette},
+		texture::{BspMipTexture, BspTexInfo},
 		util::{NoField, UBspValue},
 		visdata::BspVisData,
 		LumpDirectory, LumpEntry,
