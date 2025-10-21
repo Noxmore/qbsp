@@ -207,6 +207,8 @@ where
 ///
 /// In almost all cases, BSP38 and BSP30 do not have increased limits, and so they still use 16-bit indices.
 #[derive(BspVariableValue, Hash, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(u16)]
 #[bsp2(u32)]
 #[bsp30(u16)]
@@ -217,6 +219,8 @@ pub struct UBspValue(pub u32);
 ///
 /// In almost all cases, BSP38 and BSP30 do not have increased limits, and so they still use 16-bit indices.
 #[derive(BspVariableValue, Hash, Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(i16)]
 #[bsp2(i32)]
 #[bsp30(i16)]

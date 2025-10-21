@@ -1,16 +1,17 @@
 //! BSP data definitions.
 
-use super::*;
 use crate::{
 	bsp3x::{BspLeafContentFlags, BspSurfaceFlags, BspTexExtraInfo},
 	idtech2::BspNodeSubRef,
+	prelude::*,
 	*,
 };
 
-use enumflags2::BitFlags;
 pub use idtech2::{BspEdge, BspFace};
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(u32)]
 #[bsp2(u32)]
 #[bsp30(u32)]
@@ -18,6 +19,8 @@ pub use idtech2::{BspEdge, BspFace};
 pub struct TextureIdxField(pub Option<u32>);
 
 #[derive(BspVariableValue, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(NoField)]
 #[bsp2(NoField)]
 #[bsp30(NoField)]
@@ -73,13 +76,13 @@ impl From<BspTexFlags> for BspTexInfoFlags {
 	fn from(value: BspTexFlags) -> Self {
 		Self {
 			texture_flags: Some(value),
-			surface_flags: Default::default(),
+			surface_flags: BspSurfaceFlags::empty(),
 		}
 	}
 }
 
-impl From<BitFlags<BspSurfaceFlags>> for BspTexInfoFlags {
-	fn from(value: BitFlags<BspSurfaceFlags>) -> Self {
+impl From<BspSurfaceFlags> for BspTexInfoFlags {
+	fn from(value: BspSurfaceFlags) -> Self {
 		Self {
 			texture_flags: None,
 			surface_flags: value,
@@ -94,14 +97,14 @@ pub struct BspTexInfoFlags {
 	/// If this is `None`, then the name should be used to check the texture flags (for Goldsrc and Quake 2)
 	pub texture_flags: Option<BspTexFlags>,
 	/// For BSP2 and BSP29, this is always zero.
-	pub surface_flags: BitFlags<BspSurfaceFlags>,
+	pub surface_flags: BspSurfaceFlags,
 }
 
 impl BspVariableValue for BspTexInfoFlags {
 	type Bsp29 = BspTexFlags;
 	type Bsp2 = BspTexFlags;
-	type Bsp30 = BitFlags<BspSurfaceFlags>;
-	type Bsp38 = BitFlags<BspSurfaceFlags>;
+	type Bsp30 = BspSurfaceFlags;
+	type Bsp38 = BspSurfaceFlags;
 }
 
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -119,6 +122,8 @@ pub enum BspTexFlags {
 }
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(u32)]
 #[bsp2(u32)]
 #[bsp30(u32)]
@@ -314,6 +319,8 @@ impl From<i32> for VisdataRef {
 }
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(NoField)]
 #[bsp2(NoField)]
 #[bsp30(NoField)]
@@ -321,11 +328,13 @@ impl From<i32> for VisdataRef {
 pub struct BspArea(pub Option<u16>);
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp29(Bsp29LeafContents)]
 #[bsp2(Bsp29LeafContents)]
-#[bsp30(BitFlags<BspLeafContentFlags>)]
-#[bsp38(BitFlags<BspLeafContentFlags>)]
-pub struct BspLeafContents(pub BitFlags<BspLeafContentFlags>);
+#[bsp30(BspLeafContentFlags)]
+#[bsp38(BspLeafContentFlags)]
+pub struct BspLeafContents(pub BspLeafContentFlags);
 
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]

@@ -137,13 +137,13 @@ impl BspData {
 
 				// Trace through child nodes near child first
 				let side_result = internal(ctx, if front_side { *node.front } else { *node.back }, from, mid);
-				if ctx.data.leaves[side_result.leaf_idx].contents.contains(BspLeafContentFlags::Solid) {
+				if ctx.data.leaves[side_result.leaf_idx].contents.contains(BspLeafContentFlags::SOLID) {
 					return side_result;
 				}
 
 				// Sort of hacky, but this is what Quake's implementation does, so i guess it's fine.
 				let mid_leaf_idx = ctx.data.leaf_at_point_in_node(if front_side { *node.back } else { *node.front }, mid);
-				if !ctx.data.leaves[mid_leaf_idx].contents.contains(BspLeafContentFlags::Solid) {
+				if !ctx.data.leaves[mid_leaf_idx].contents.contains(BspLeafContentFlags::SOLID) {
 					return internal(ctx, if front_side { *node.back } else { *node.front }, mid, to);
 				}
 

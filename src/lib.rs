@@ -360,7 +360,7 @@ impl BspData {
 				vec![]
 			},
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
-			mark_surfaces: read_lump(bsp, lump_dir.leaves, "mark surfaces", &ctx)?,
+			mark_surfaces: read_lump(bsp, lump_dir.mark_surfaces, "mark surfaces", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
 			models: read_lump(bsp, lump_dir.models, "models", &ctx)?,

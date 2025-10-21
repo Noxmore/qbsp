@@ -185,7 +185,7 @@ fn validate_bounds() {
 		}
 
 		for surface_idx in &data.mark_surfaces {
-			assert!(surface_idx.0 < data.faces.len().max(1) as u32);
+			assert!(dbg!(surface_idx.0) < dbg!(data.faces.len().max(1)) as u32, "Failed for {name}");
 		}
 
 		for edge in &data.edges {
