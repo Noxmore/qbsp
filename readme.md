@@ -3,17 +3,17 @@
 [![crates.io](https://img.shields.io/crates/v/qbsp)](https://crates.io/crates/qbsp)
 [![docs.rs](https://docs.rs/qbsp/badge.svg)](https://docs.rs/qbsp)
 
-Rust crate for parsing, and operating with Quake 1 BSP files.
+Rust crate for parsing, and operating with Quake 1, 2, and GoldSrc BSP files.
 
 ## Features
-- Parsing `.bsp` files with the BSP29 and BSP2 formats.
+- Parsing `.bsp` files with the BSP29 BSP2, BSP30, and BSP38 formats.
 - Structured easy access to the bsp data.
 - BSP raycasting.
 - Mesh generation.
 - Lightmap atlas generation either per-style or per-slot (`.lit` supported).
-- BSPX support, including built-in structures/support for the `RGBLIGHTING`, `LIGHTGRID_OCTREE`, `BRUSHLIST`, and `DECOUPLED_LM` lumps.
+- BSPX support, including built-in structures for the `RGBLIGHTING`, `LIGHTGRID_OCTREE`, `BRUSHLIST`, and `DECOUPLED_LM` lumps.
 
-## How to use
+## Quickstart
 ```rust
 use qbsp::prelude::*;
 
