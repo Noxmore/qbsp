@@ -88,7 +88,7 @@ pub struct BspTexInfo {
 
 	pub texture_idx: TextureIdxField,
 
-	/// Goldsrc and Q2 have surface flags, Q1 and BSP2 have texture flags.
+	/// GoldSrc and Q2 have surface flags, Q1 and BSP2 have texture flags.
 	pub flags: BspTexInfoFlags,
 
 	/// Extra info stored directly on the `TexInfo` - for Quake 2 (which does not have a lump for embedded textures).
@@ -147,7 +147,7 @@ impl From<BspSurfaceFlags> for BspTexInfoFlags {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTexInfoFlags {
-	/// If this is `None`, then the name should be used to check the texture flags (for Goldsrc and Quake 2)
+	/// If this is `None`, then the name should be used to check the texture flags (for GoldSrc and Quake 2)
 	pub texture_flags: Option<BspTexFlags>,
 	/// For BSP2 and BSP29, this is always zero.
 	pub surface_flags: BspSurfaceFlags,
@@ -160,7 +160,7 @@ impl BspVariableValue for BspTexInfoFlags {
 	type Bsp38 = BspSurfaceFlags;
 }
 
-/// Quake 1-style texture flags. Quake 2 ditches this entirely, Goldsrc
+/// Quake 1-style texture flags. Quake 2 ditches this entirely, GoldSrc
 /// mostly handles this on a per-brush basis using `rendermode` and
 /// related entity keys.
 #[derive(BspValue, Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
@@ -310,7 +310,7 @@ impl std::fmt::Debug for BspTextureData {
 	}
 }
 
-/// Embedded texture data. Goldsrc stores these in a separate lump.
+/// Embedded texture data. GoldSrc stores these in a separate lump.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

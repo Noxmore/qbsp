@@ -170,7 +170,7 @@ pub trait BspVariableValue: Sized {
 	type Bsp29: BspValue + Into<Self>;
 	/// The type of this field for BSP2 (BSP v29 with increased limits, originally for RemakeQuake). See [Quake Wiki](https://quakewiki.org/wiki/BSP2).
 	type Bsp2: BspValue + Into<Self>;
-	/// The type of this field for BSP30 (Goldsrc). See [Valve Developer Community](https://developer.valvesoftware.com/wiki/BSP_(GoldSrc)).
+	/// The type of this field for BSP30 (GoldSrc). See [Valve Developer Community](https://developer.valvesoftware.com/wiki/BSP_(GoldSrc)).
 	type Bsp30: BspValue + Into<Self>;
 	/// The type of this field for BSP38 (Quake 2). See [Flipcode](https://www.flipcode.com/archives/Quake_2_BSP_File_Format.shtml).
 	type Bsp38: BspValue + Into<Self>;

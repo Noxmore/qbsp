@@ -144,7 +144,7 @@ pub enum BspFormat {
 	/// Original quake format, in most cases, you should use BSP2 over this.
 	BSP29,
 
-	/// Goldsrc format. For the sake of `BspVariableValue`, this is usually the same as `BSP38`,
+	/// GoldSrc format. For the sake of `BspVariableValue`, this is usually the same as `BSP38`,
 	/// but differs in some cases (e.g. each model having up to 4 hulls).
 	BSP30,
 

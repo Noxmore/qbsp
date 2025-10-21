@@ -65,7 +65,7 @@ impl BspData {
 			};
 
 			grouped_faces
-				// TODO: We should figure out the texture flags from the name for BSP3x (Goldsrc/Quake 2)
+				// TODO: We should figure out the texture flags from the name for BSP3x (GoldSrc/Quake 2)
 				.entry((texture.header.name.as_str(), tex_info.flags.texture_flags.unwrap_or_default()))
 				.or_default()
 				.push((i, face));
