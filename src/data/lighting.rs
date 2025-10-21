@@ -113,7 +113,7 @@ impl std::fmt::Debug for BspLighting {
 }
 
 /// An offset into the lightmap. Specified as a number of bytes for BSP2, BSP30 and BSP38, as they always have RGB lighting.
-/// Specified as a number of pixels for BSP29, as for BSPX lightmaps they are designed to be backwards-compatible with Quake
+/// Specified as a number of pixels for BSP29. As for BSPX lightmaps, they are designed to be backwards-compatible with Quake
 /// lightmaps. This is normalised to a number of pixels, as the number of bytes will depend on the exact lightmap format used.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
