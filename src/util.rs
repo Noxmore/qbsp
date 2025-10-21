@@ -2,7 +2,8 @@ use std::{ops::Range, slice::Iter};
 
 use glam::Vec2;
 
-use crate::*;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 // Simple generic rectangle type.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
