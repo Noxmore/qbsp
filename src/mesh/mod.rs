@@ -24,6 +24,11 @@ pub struct ExportedMesh {
 	pub normals: Vec<Vec3>,
 	/// Normalized texture coordinates. (0..1)
 	pub uvs: Vec<Vec2>,
+	/// `true` if the uvs have been scaled based on texture size, otherwise `false`.
+	///
+	/// Scaling will not occur if the texture's size isn't stored in the BSP, such as in BSP38 (Quake 2) files.
+	/// For those, it is up to you to divide all elements of [`ExportedMesh::uvs`] by the size of the texture by the name of [`ExportedMesh::texture`].
+	pub prescaled_uvs: bool,
 	/// Optional uvs for the lightmap atlas.
 	pub lightmap_uvs: Option<Vec<Vec2>>,
 	/// Triangle list.
@@ -76,16 +81,11 @@ impl BspData {
 
 				let plane = &self.planes[face.plane_idx.0 as usize];
 				let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-				// TODO: For formats that store textures externally (at time of writing, only Quake 2), we
-				// need to either provide a way for the caller to let us load textures or simply group by
-				// name and return the UVs unscaled (letting the caller scale them once the textures are
-				// loaded).
 				let texture_size = tex_info
 					.texture_idx
 					.and_then(|idx| self.textures.get(idx as usize))
 					.and_then(|tex| tex.as_ref())
-					.map(|tex| vec2(tex.header.width as f32, tex.header.height as f32))
-					.unwrap_or(Vec2::ONE);
+					.map(|tex| vec2(tex.header.width as f32, tex.header.height as f32));
 
 				// The uv coordinates of the face's lightmap in the world, rather than on a lightmap atlas
 				let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.0 as usize);
@@ -97,7 +97,8 @@ impl BspData {
 
 					let uv = tex_info.projection.project(pos);
 
-					mesh.uvs.push(uv / texture_size);
+					mesh.prescaled_uvs = texture_size.is_some();
+					mesh.uvs.push(if let Some(texture_size) = texture_size { uv / texture_size } else { uv });
 					lightmap_world_uvs.push(uv);
 				}
 
