@@ -179,15 +179,16 @@ impl BspValue for LumpDirectory {
 			bspx: bspx::BspxDirectory::default(),
 		};
 
-		// BSP30/BSP38 never have BSPX dir.
-		if [BspFormat::BSP29, BspFormat::BSP2].contains(&reader.ctx.format) {
-			let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
+		let mut bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
+		// I'm guessing this is because of the added version number? This code certainly doesn't look very good, but it seems to work.
+		if reader.ctx.format == BspFormat::BSP38 {
+			bspx_offset += 3;
+		}
 
-			match reader.with_pos(bspx_offset as usize).read() {
-				Ok(bspx_dir) => dir.bspx = bspx_dir,
-				Err(BspParseError::NoBspxDirectory) => {}
-				Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
-			}
+		match reader.with_pos(bspx_offset as usize).read() {
+			Ok(bspx_dir) => dir.bspx = bspx_dir,
+			Err(BspParseError::NoBspxDirectory) => {}
+			Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
 		}
 
 		Ok(dir)
