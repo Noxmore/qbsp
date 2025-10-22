@@ -7,7 +7,7 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	data::util::NoField,
+	data::util::{BspVariableArray, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
 	BspParseResultDoingJobExt, BspResult,
 };
@@ -64,33 +64,14 @@ pub struct BspClusterOffsets {
 	pub phs: u32,
 }
 
-impl BspValue for Vec<BspClusterOffsets> {
-	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		let num_clusters: u32 = reader.read()?;
-
-		let mut out = Vec::with_capacity(num_clusters as usize);
-
-		for _ in 0..num_clusters {
-			out.push(reader.read()?);
-		}
-
-		Ok(out)
-	}
-
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		// Not meaningful for this type, but since `BspValue` requires this, we supply a minimum size.
-		u32::bsp_struct_size(ctx)
-	}
-}
-
 #[derive(BspVariableValue, Default, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[bsp2(NoField)]
 #[bsp29(NoField)]
 #[bsp30(NoField)]
-#[bsp38(Vec<BspClusterOffsets>)]
-pub struct BspVisDataOffsets(pub Option<Vec<BspClusterOffsets>>);
+#[bsp38(BspVariableArray<BspClusterOffsets, u32>)]
+pub struct BspVisDataOffsets(pub Option<BspVariableArray<BspClusterOffsets, u32>>);
 
 /// The visiblity lump - for pre-BSP38 files, this is just a flat byte vector. For BSP38,
 /// this includes a header describing where in the bytes to find the PVS and PHS (see
