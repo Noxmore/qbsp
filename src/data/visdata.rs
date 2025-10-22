@@ -135,7 +135,7 @@ impl BspValue for BspVisData {
 		})
 	}
 
-	fn bsp_struct_size(ctx: &BspParseContext) -> usize {
-		BspVisDataOffsets::bsp_struct_size(ctx)
+	fn bsp_struct_size(_: &BspParseContext) -> usize {
+		unimplemented!()
 	}
 }
