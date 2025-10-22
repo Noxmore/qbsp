@@ -37,7 +37,7 @@ mod no_field_impls {
 		data::{
 			models::PerSizeHulls,
 			nodes::{BspAmbience, BspLeafBrushes, BspNodeRef},
-			texture::{BspTexExtraInfo, Palette},
+			texture::{BspTexQ2Info, Palette},
 			visdata::BspClusterOffsets,
 		},
 		LumpEntry,
@@ -58,7 +58,7 @@ mod no_field_impls {
 
 	impl_from_no_field_for_option!(u32);
 	impl_from_no_field_for_option!(u16);
-	impl_from_no_field_for_option!(BspTexExtraInfo);
+	impl_from_no_field_for_option!(BspTexQ2Info);
 	impl_from_no_field_for_option!(BspAmbience);
 	impl_from_no_field_for_option!(BspLeafBrushes);
 	impl_from_no_field_for_option!(LumpEntry);

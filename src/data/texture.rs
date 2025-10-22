@@ -9,10 +9,9 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	BspData,
 	data::util::{FixedStr, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
+	BspData, BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 };
 
 impl BspData {
@@ -90,8 +89,8 @@ pub struct TextureIdxField(pub Option<u32>);
 #[bsp29(NoField)]
 #[bsp2(NoField)]
 #[bsp30(NoField)]
-#[bsp38(BspTexExtraInfo)]
-pub struct ExtraInfoField(pub Option<BspTexExtraInfo>);
+#[bsp38(BspTexQ2Info)]
+pub struct Q2InfoField(pub Option<BspTexQ2Info>);
 
 #[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -105,10 +104,10 @@ pub struct BspTexInfo {
 	pub flags: BspTexInfoFlags,
 
 	/// Extra info stored directly on the `TexInfo` - for Quake 2 (which does not have a lump for embedded textures).
-	pub extra_info: ExtraInfoField,
+	pub extra_info: Q2InfoField,
 }
 
-impl BspTexExtraInfo {
+impl BspTexQ2Info {
 	pub const UNIT_TEXTURE_BRIGHTNESS: u32 = 255;
 
 	/// The brightness of the texture - if in the range 0..1 this material is diffuse, if it's
@@ -250,14 +249,14 @@ impl BspValue for BspSurfaceFlags {
 	}
 }
 
-/// Extra info stored directly on the `TexInfo` - for Quake 2 (which does not have a lump for embedded textures).
+/// Extra info stored directly on the [`BspTexInfo`] - for Quake 2 (which does not have a lump for embedded textures).
 #[derive(BspValue, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct BspTexExtraInfo {
+pub struct BspTexQ2Info {
 	/// Texture brightness - 255 is "normal" brightness (should display the same as Quake 1),
 	/// higher is emissive, lower is darker. To get this as a floating-point number, see
-	/// [`BspTexExtraInfo::brightness`].
+	/// [`BspTexQ2Info::brightness`].
 	pub value: u32,
 
 	/// The name of the texture.
