@@ -9,10 +9,24 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+	BspData,
 	data::util::{FixedStr, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
 	BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 };
+
+impl BspData {
+	/// Helper function to get a texture name from a [`BspTexInfo`] without worrying about format.
+	pub fn get_texture_name<'a>(&'a self, tex_info: &'a BspTexInfo) -> Option<&'a str> {
+		if let Some(extra_info) = &tex_info.extra_info.0 {
+			Some(extra_info.name.as_str())
+		} else if let Some(texture_idx) = tex_info.texture_idx.0 {
+			Some(self.textures.get(texture_idx as usize).and_then(Option::as_ref)?.header.name.as_str())
+		} else {
+			None
+		}
+	}
+}
 
 /// An id Tech 2 palette to use for embedded images.
 #[repr(C)] // Because we transmute data with QUAKE_PALETTE, don't want Rust to pull any shenanigans
