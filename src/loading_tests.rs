@@ -43,6 +43,8 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	testing_bsp!("librequake/lq_e0m2-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m3-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m4-quake2.bsp"),
+	testing_bsp!("example-quake2.bsp"),
+	EXAMPLE_BSP,
 	// I couldn't find any FOSS GoldSrc .bsp files and couldn't
 	// work out how to compile my own in a way that didn't end
 	// up compiling proprietary HL1 textures into the .bsp,
@@ -55,7 +57,6 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	// testing_bsp!("halflife/c0a0c.bsp"),
 	// testing_bsp!("halflife/c0a0d.bsp"),
 	// testing_bsp!("halflife/c0a0e.bsp"),
-	// EXAMPLE_BSP,
 ];
 
 #[test]
