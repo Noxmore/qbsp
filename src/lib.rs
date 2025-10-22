@@ -154,6 +154,16 @@ pub enum BspFormat {
 	/// Quake 2 format.
 	BSP38,
 }
+impl BspFormat {
+	/// Returns the character used to denote liquids by prefixing the texture name in the engine that uses this format.
+	pub fn liquid_prefix(self) -> Option<char> {
+		match self {
+			Self::BSP2 | Self::BSP29 => Some('*'),
+			Self::BSP30 => Some('!'),
+			Self::BSP38 => None,
+		}
+	}
+}
 
 impl BspValue for BspFormat {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
