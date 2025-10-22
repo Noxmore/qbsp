@@ -36,9 +36,8 @@ mod no_field_impls {
 	use crate::{
 		data::{
 			models::PerSizeHulls,
-			nodes::{BspAmbience, BspLeafBrushes, BspNodeRef},
+			nodes::{BspAmbience, BspLeafBrushes},
 			texture::{BspTexQ2Info, Palette},
-			visdata::BspClusterOffsets,
 		},
 		LumpEntry,
 	};
@@ -46,6 +45,8 @@ mod no_field_impls {
 	use super::NoField;
 
 	/// Workaround for `impl From<T> for Option<T>` being in the stdlib
+	///
+	/// Noxmore: I really do not like this, but I can't think of another solution right now.
 	macro_rules! impl_from_no_field_for_option {
 		($opt_inner:ty) => {
 			impl From<NoField> for Option<$opt_inner> {
@@ -64,8 +65,18 @@ mod no_field_impls {
 	impl_from_no_field_for_option!(LumpEntry);
 	impl_from_no_field_for_option!(Palette);
 	impl_from_no_field_for_option!(PerSizeHulls);
-	impl_from_no_field_for_option!(Vec<BspClusterOffsets>);
-	impl_from_no_field_for_option!([BspNodeRef; 3]);
+}
+
+// We can do _some_ glob impls.
+impl<T, N> From<NoField> for Option<BspVariableArray<T, N>> {
+	fn from(_: NoField) -> Self {
+		None
+	}
+}
+impl<T, const N: usize> From<NoField> for Option<[T; N]> {
+	fn from(_: NoField) -> Self {
+		None
+	}
 }
 
 /// An unsigned variable integer parsed from a BSP. u32 when parsing BSP2, u16 when parsing BSP29.
