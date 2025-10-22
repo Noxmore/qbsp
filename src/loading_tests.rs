@@ -43,6 +43,7 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	testing_bsp!("librequake/lq_e0m2-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m3-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m4-quake2.bsp"),
+	testing_bsp!("example-halflife.bsp"),
 	testing_bsp!("example-quake2.bsp"),
 	EXAMPLE_BSP,
 	// I couldn't find any FOSS GoldSrc .bsp files and couldn't
