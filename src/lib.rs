@@ -158,7 +158,9 @@ impl BspFormat {
 	/// Returns the character used to denote liquids by prefixing the texture name in the engine that uses this format.
 	pub fn liquid_prefix(self) -> Option<char> {
 		match self {
+			// https://quakewiki.org/wiki/Textures
 			Self::BSP2 | Self::BSP29 => Some('*'),
+			// https://developer.valvesoftware.com/wiki/Texture_prefixes
 			Self::BSP30 => Some('!'),
 			Self::BSP38 => None,
 		}
