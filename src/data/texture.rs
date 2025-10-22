@@ -278,6 +278,7 @@ impl PlanarTextureProjection {
 	}
 }
 
+/// GoldSrc (BSP30) levels can have per-texture pallettes stored in WAD files with the WAD3 format.
 #[derive(BspVariableValue, Default, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
