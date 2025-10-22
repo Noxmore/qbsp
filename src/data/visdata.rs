@@ -146,7 +146,7 @@ impl BspVisData {
 
 impl BspValue for BspVisData {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
-		let vis_data_offsets = reader.read()?;
+		let vis_data_offsets: BspVisDataOffsets = reader.read()?;
 
 		Ok(Self {
 			vis_data_offsets,
