@@ -127,6 +127,10 @@ impl BspVisData {
 
 impl BspValue for BspVisData {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		// It is a valid state if there is no visibility data at all.
+		if reader.is_empty() {
+			return Ok(Self::default());
+		}
 		let vis_data_offsets: BspVisDataOffsets = reader.read()?;
 
 		Ok(Self {
