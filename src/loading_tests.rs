@@ -120,12 +120,14 @@ fn validate_bounds() {
 	}
 
 	for TestingBsp { name, bsp, lit } in TESTING_BSPS.iter().copied() {
-		let data = BspData::parse(BspParseInput {
+		let data = match BspData::parse(BspParseInput {
 			bsp,
 			lit,
 			settings: BspParseSettings::default(),
-		})
-		.unwrap();
+		}) {
+			Ok(data) => data,
+			Err(err) => panic!("Error loading {name}: {err}"),
+		};
 
 		// We max(0) the lengths here to make index 0 a valid index for a length of 0
 
