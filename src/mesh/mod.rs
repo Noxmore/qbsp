@@ -56,17 +56,10 @@ impl BspData {
 		for i in model.first_face..model.first_face + model.num_faces {
 			let face = &self.faces[i as usize];
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-			let Some(texture) = tex_info
-				.texture_idx
-				.and_then(|idx| self.textures.get(idx as usize))
-				.and_then(|tex| tex.as_ref())
-			else {
-				continue;
-			};
+			let Some(name) = self.get_texture_name(tex_info) else { continue };
 
 			grouped_faces
-				// TODO: We should figure out the texture flags from the name for BSP3x (GoldSrc/Quake 2)
-				.entry((texture.header.name.as_str(), tex_info.flags.texture_flags.unwrap_or_default()))
+				.entry((name, tex_info.flags.texture_flags.unwrap_or_default()))
 				.or_default()
 				.push((i, face));
 		}
