@@ -100,7 +100,9 @@ impl<'a> BspByteReader<'a> {
 
 /// Defines how a type should be read from a BSP file.
 pub trait BspValue: Sized {
+	/// Parse this value, advancing the byte reader.
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self>;
+	/// How big this value is in the BSP file in bytes. If it is a variable size, return `unimplemented!()`, as calling this on variable-sized values would be a bug.
 	fn bsp_struct_size(ctx: &BspParseContext) -> usize;
 }
 
