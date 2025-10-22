@@ -253,9 +253,6 @@ pub fn read_mip_texture_lump(reader: &mut BspByteReader) -> BspResult<Vec<Option
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspData {
-	// TODO:
-	#[deprecated(note = "Accidentally included, will be removed in the next major release")]
-	pub format: BspFormat,
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.
 	/// - Brush entities have a `model` property indexing into the `models` field of this struct.
@@ -335,8 +332,6 @@ impl BspData {
 		let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
 
 		let data = Self {
-			#[expect(deprecated)]
-			format: ctx.format,
 			entities: std::str::from_utf8(&entities_bytes)
 				.map_err(BspParseError::map_utf8_error(&entities_bytes))
 				.job("Reading entities lump")?
