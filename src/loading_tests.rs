@@ -29,9 +29,14 @@ macro_rules! testing_bsp {
 	};
 }
 
-pub static EXAMPLE_BSP: TestingBsp = testing_bsp!("example.bsp");
+/// `bevy_trenchbroom`'s `example.bsp` in different formats.
+static EXAMPLE_BSPS: &[TestingBsp] = &[
+	testing_bsp!("example-halflife.bsp"),
+	testing_bsp!("example-quake2.bsp"),
+	testing_bsp!("example.bsp"),
+];
 
-pub static TESTING_BSPS: &[TestingBsp] = &[
+static TESTING_BSPS: &[TestingBsp] = &[
 	testing_bsp!("ad_crucial.bsp", "ad_crucial.lit"),
 	testing_bsp!("ad_end.bsp", "ad_end.lit"),
 	testing_bsp!("ad_tears.bsp", "ad_tears.lit"),
@@ -43,61 +48,88 @@ pub static TESTING_BSPS: &[TestingBsp] = &[
 	testing_bsp!("librequake/lq_e0m2-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m3-quake2.bsp"),
 	testing_bsp!("librequake/lq_e0m4-quake2.bsp"),
-	testing_bsp!("example-halflife.bsp"),
-	testing_bsp!("example-quake2.bsp"),
-	EXAMPLE_BSP,
-	// I couldn't find any FOSS GoldSrc .bsp files and couldn't
-	// work out how to compile my own in a way that didn't end
-	// up compiling proprietary HL1 textures into the .bsp,
-	// but if you put your own copy of some HL1 maps into the
-	// `assets/halflife` directory you can test this code
-	// against them.
-	// testing_bsp!("halflife/c0a0.bsp"),
-	// testing_bsp!("halflife/c0a0a.bsp"),
-	// testing_bsp!("halflife/c0a0b.bsp"),
-	// testing_bsp!("halflife/c0a0c.bsp"),
-	// testing_bsp!("halflife/c0a0d.bsp"),
-	// testing_bsp!("halflife/c0a0e.bsp"),
 ];
+
+fn all_bsps() -> impl Iterator<Item = TestingBsp> {
+	TESTING_BSPS.iter().chain(EXAMPLE_BSPS.iter()).copied()
+}
 
 #[test]
 fn use_bspx_rgb_lighting() {
-	let with_usage = BspData::parse(BspParseInput {
-		bsp: EXAMPLE_BSP.bsp,
-		lit: None,
-		settings: BspParseSettings { use_bspx_rgb_lighting: true },
-	})
-	.unwrap();
+	for TestingBsp { name, bsp, lit: _ } in EXAMPLE_BSPS.iter().copied() {
+		println!("{name}");
 
-	let without_usage = BspData::parse(BspParseInput {
-		bsp: EXAMPLE_BSP.bsp,
-		lit: None,
-		settings: BspParseSettings {
-			use_bspx_rgb_lighting: false,
-		},
-	})
-	.unwrap();
+		let with_usage = BspData::parse(BspParseInput {
+			bsp,
+			lit: None,
+			settings: BspParseSettings { use_bspx_rgb_lighting: true },
+		})
+		.unwrap();
 
-	assert!(matches!(with_usage.lighting, Some(BspLighting::Colored(_))));
-	assert!(without_usage.lighting.is_none());
+		let without_usage = BspData::parse(BspParseInput {
+			bsp,
+			lit: None,
+			settings: BspParseSettings {
+				use_bspx_rgb_lighting: false,
+			},
+		})
+		.unwrap();
+
+		assert!(matches!(with_usage.lighting, Some(BspLighting::Colored(_))));
+		// The Half-Life and Quake 2 BSPs always contain basic lighting, even if specified not to.
+		if name == "example.bsp" {
+			assert!(without_usage.lighting.is_none());
+		}
+	}
 }
 
 #[test]
 fn lit_loading() {
-	for TestingBsp { name, bsp, lit } in TESTING_BSPS.iter().copied() {
+	for TestingBsp { name, bsp, lit } in all_bsps() {
 		println!("{name}");
 		if lit.is_none() {
 			continue;
 		};
 
-		let data = BspData::parse(BspParseInput {
+		let data = match BspData::parse(BspParseInput {
 			bsp,
 			lit,
 			settings: BspParseSettings::default(),
-		})
-		.unwrap();
+		}) {
+			Ok(data) => data,
+			Err(err) => panic!("Error loading {name}: {err}"),
+		};
 
 		assert!(matches!(data.lighting, Some(BspLighting::Colored(_))));
+	}
+}
+
+#[test]
+fn prase_bspx_lumps() {
+	for TestingBsp { name, bsp, lit } in EXAMPLE_BSPS.iter().copied() {
+		println!("{name}");
+
+		let data = match BspData::parse(BspParseInput {
+			bsp,
+			lit,
+			settings: BspParseSettings::default(),
+		}) {
+			Ok(data) => data,
+			Err(err) => panic!("Error loading {name}: {err}"),
+		};
+
+		// For nice error messages
+		if let Err(err) = data.bspx.parse_brush_list(&data.parse_ctx).unwrap() {
+			panic!("{err}");
+		}
+		if let Err(err) = data.bspx.parse_decoupled_lm(&data.parse_ctx).unwrap() {
+			panic!("{err}");
+		}
+		if let Err(err) = data.bspx.parse_light_grid_octree(&data.parse_ctx).unwrap() {
+			panic!("{err}");
+		}
+
+		// RGB lighting is already handled by `use_bspx_rgb_lighting`
 	}
 }
 
@@ -119,7 +151,8 @@ fn validate_bounds() {
 		assert!((start as usize + num.saturating_sub(1) as usize) < len)
 	}
 
-	for TestingBsp { name, bsp, lit } in TESTING_BSPS.iter().copied() {
+	for TestingBsp { name, bsp, lit } in all_bsps() {
+		println!("{name}");
 		let data = match BspData::parse(BspParseInput {
 			bsp,
 			lit,
