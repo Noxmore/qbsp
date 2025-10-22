@@ -348,7 +348,7 @@ impl BspData {
 				vec![]
 			},
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx).job("vertices")?,
-			visibility: BspByteReader::new(lump_dir.visibility.get(bsp)?, &ctx).read().job("visibiliy")?,
+			visibility: BspByteReader::new(lump_dir.visibility.get(bsp)?, &ctx).read().job("visibility")?,
 			nodes: read_lump(bsp, lump_dir.nodes, "nodes", &ctx)?,
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
