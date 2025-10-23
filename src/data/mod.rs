@@ -62,7 +62,7 @@ impl LumpEntry {
 #[bsp29(LumpEntry)]
 #[bsp30(LumpEntry)]
 #[bsp38(NoField)]
-pub struct PreBsp38LumpEntry(Option<LumpEntry>);
+pub struct PreBsp38LumpEntry(pub Option<LumpEntry>);
 
 /// A `LumpEntry` that only exists for BSP38.
 #[derive(BspVariableValue, Debug, Clone, Copy)]
@@ -72,7 +72,7 @@ pub struct PreBsp38LumpEntry(Option<LumpEntry>);
 #[bsp29(NoField)]
 #[bsp30(NoField)]
 #[bsp38(LumpEntry)]
-pub struct Bsp38OnlyLumpEntry(Option<LumpEntry>);
+pub struct Bsp38OnlyLumpEntry(pub Option<LumpEntry>);
 
 /// Contains the list of lump entries
 #[derive(Debug, Clone)]

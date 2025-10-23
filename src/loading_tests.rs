@@ -162,7 +162,7 @@ fn validate_bounds() {
 			Err(err) => panic!("Error loading {name}: {err}"),
 		};
 
-		// We max(0) the lengths here to make index 0 a valid index for a length of 0
+		// We max(1) the lengths here to make index 0 a valid index for a length of 0
 
 		for node in &data.nodes {
 			assert!(node.plane_idx < data.planes.len().max(1) as u32);
@@ -224,6 +224,15 @@ fn validate_bounds() {
 			}
 
 			validate_range(model.first_face, model.num_faces, data.faces.len());
+		}
+
+		for brush in &data.brushes {
+			validate_range(brush.first_side, brush.num_sides, data.brush_sides.len());
+		}
+
+		for brush_side in &data.brush_sides {
+			assert!(brush_side.plane_idx < data.planes.len().max(1) as u16);
+			assert!(brush_side.tex_info_idx < data.tex_info.len().max(1) as u16);
 		}
 	}
 }

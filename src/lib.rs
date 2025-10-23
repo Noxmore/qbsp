@@ -37,6 +37,7 @@ pub use data::texture::Palette;
 
 use crate::{
 	data::{
+		brush::{BspBrush, BspBrushSide},
 		bspx::BspxData,
 		lighting::BspLighting,
 		models::{BspEdge, BspFace, BspModel},
@@ -286,9 +287,8 @@ pub struct BspData {
 	pub edges: Vec<BspEdge>,
 	pub surface_edges: Vec<i32>,
 	pub models: Vec<BspModel>,
-	// TODO: Are brushes/brush sides actually used in-game?
-	// pub brushes: (),
-	// pub brush_sides: (),
+	pub brushes: Vec<BspBrush>,
+	pub brush_sides: Vec<BspBrushSide>,
 	// TODO: Areas/area portals are used by Q2 to stop rendering areas after
 	// doors close - useful but not required to behave correctly.
 	// pub areas: (),
@@ -343,7 +343,7 @@ impl BspData {
 			textures: if let Some(tex_lump) = *lump_dir.textures {
 				read_mip_texture_lump(&mut BspByteReader::new(tex_lump.get(bsp)?, &ctx)).job("Reading texture lump")?
 			} else {
-				vec![]
+				Vec::new()
 			},
 			vertices: read_lump(bsp, lump_dir.vertices, "vertices", &ctx).job("vertices")?,
 			visibility: BspByteReader::new(lump_dir.visibility.get(bsp)?, &ctx).read().job("visibility")?,
@@ -362,13 +362,23 @@ impl BspData {
 			clip_nodes: if let Some(clip_node_lump) = *lump_dir.clip_nodes {
 				read_lump(bsp, clip_node_lump, "clip nodes", &ctx)?
 			} else {
-				vec![]
+				Vec::new()
 			},
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
 			mark_surfaces: read_lump(bsp, lump_dir.mark_surfaces, "mark surfaces", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,
 			models: read_lump(bsp, lump_dir.models, "models", &ctx)?,
+			brushes: if let Some(lump_entry) = *lump_dir.brushes {
+				read_lump(bsp, lump_entry, "brushes", &ctx)?
+			} else {
+				Vec::new()
+			},
+			brush_sides: if let Some(lump_entry) = *lump_dir.brush_sides {
+				read_lump(bsp, lump_entry, "brush sides", &ctx)?
+			} else {
+				Vec::new()
+			},
 
 			bspx,
 
