@@ -6,8 +6,8 @@ use crate::{
 		nodes::{BspNodeRef, FloatBoundingBox},
 		util::{NoField, UBspValue},
 	},
-	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspData, BspParseResultDoingJobExt, BspResult,
+	reader::BspVariableValue,
+	BspData,
 };
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;

@@ -16,7 +16,7 @@ use bitflags::bitflags;
 use crate::{
 	data::util::NoField,
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspParseResultDoingJobExt, BspResult,
+	BspResult,
 };
 
 /// A reference to a [`BspNode`].

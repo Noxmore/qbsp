@@ -53,7 +53,7 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 				};
 				(
 					quote! {
-						impl BspVariableValue for #ident {
+						impl ::qbsp::reader::BspVariableValue for #ident {
 							type Bsp29 = #bsp29_type;
 							type Bsp2 = #bsp2_type;
 							type Bsp30 = #bsp30_type;
@@ -110,17 +110,16 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 					quote! {
 						Ok(Self {
 							#(
-								#field_names: BspValue::bsp_parse(reader)
-									.job(concat!(
-										"Reading field \"",
-										 stringify!(#field_names),
-										 "\" on type ",
-										 stringify!(#ident)
-									))?,
+								#field_names: ::qbsp::BspParseResultDoingJobExt::job(::qbsp::reader::BspValue::bsp_parse(reader), concat!(
+									"Reading field \"",
+										stringify!(#field_names),
+										"\" on type ",
+										stringify!(#ident)
+								))?,
 							)*
 						})
 					},
-					quote! { #(<#types as BspValue>::bsp_struct_size(ctx) + )* 0 },
+					quote! { #(<#types as ::qbsp::reader::BspValue>::bsp_struct_size(ctx) + )* 0 },
 				)
 			}
 			Fields::Unnamed(_) => panic!("Tuple structs not supported"),
@@ -164,11 +163,11 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 	};
 
 	quote! {
-		impl BspValue for #ident {
-			fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		impl ::qbsp::reader::BspValue for #ident {
+			fn bsp_parse(reader: &mut ::qbsp::reader::BspByteReader) -> ::qbsp::BspResult<Self> {
 				#bsp_parse_contents
 			}
-			fn bsp_struct_size(ctx: &BspParseContext) -> usize {
+			fn bsp_struct_size(ctx: &::qbsp::reader::BspParseContext) -> usize {
 				#bsp_struct_size_contents
 			}
 		}

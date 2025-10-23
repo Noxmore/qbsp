@@ -1,5 +1,8 @@
 #![doc = include_str!("../readme.md")]
 
+// For proc macros to be able to use the `qbsp` path.
+extern crate self as qbsp;
+
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 use glam::Vec3;

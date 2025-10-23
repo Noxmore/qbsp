@@ -6,9 +6,10 @@ use qbsp_macros::{BspValue, BspVariableValue};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue};
+use crate::reader::{BspByteReader, BspParseContext, BspValue};
 use crate::{data::util::NoField, BspFormat, BspParseError, BspParseResultDoingJobExt, BspResult};
 
+pub mod brush;
 pub mod bspx;
 pub mod lighting;
 pub mod models;

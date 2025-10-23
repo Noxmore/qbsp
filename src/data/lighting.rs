@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspFormat, BspParseError, BspParseResultDoingJobExt, BspResult,
+	BspFormat, BspParseError, BspResult,
 };
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.

@@ -9,7 +9,7 @@ use qbsp_macros::BspVariableValue;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
-	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
+	reader::{BspByteReader, BspParseContext, BspValue},
 	BspParseError, BspParseResultDoingJobExt, BspResult,
 };
 

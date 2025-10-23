@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
 	data::util::{BspVariableArray, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspParseResultDoingJobExt, BspResult,
+	BspResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
