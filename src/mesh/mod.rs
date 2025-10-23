@@ -7,16 +7,20 @@ use glam::{vec2, IVec2, UVec2, Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	data::{bspx::DecoupledLightmap, models::BspFace, texture::BspTexFlags},
+	data::{
+		bspx::DecoupledLightmap,
+		models::BspFace,
+		texture::{BspTexFlags, TextureName},
+	},
 	util::Rect,
 	BspData,
 };
 
 pub mod lightmap;
 
-/// A mesh exported from a BSP file for rendering.
+/// A mesh exported from a BSP file for rendering, collision, etc.
+/// This is an in-between format that you should convert into your engine's mesh structure.
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ExportedMesh {
 	/// Positions of vertices in this mesh. NOTE: These are in Z-up coordinate space.
 	pub positions: Vec<Vec3>,
@@ -39,7 +43,7 @@ pub struct ExportedMesh {
 	/// All faces in the bsp data used to create this mesh.
 	pub faces: Vec<u32>,
 
-	pub texture: String,
+	pub texture: TextureName,
 }
 
 /// The output of [`BspData::mesh_model`]. Contains one mesh for each texture used in the model.
@@ -56,7 +60,7 @@ impl BspData {
 		let model = &self.models[model_idx];
 
 		// Group faces by texture, also storing index for packing use
-		let mut grouped_faces: HashMap<(&str, BspTexFlags), Vec<(u32, &BspFace)>> = Default::default();
+		let mut grouped_faces: HashMap<(TextureName, BspTexFlags), Vec<(u32, &BspFace)>> = Default::default();
 
 		for i in model.first_face..model.first_face + model.num_faces {
 			let face = &self.faces[i as usize];
@@ -73,7 +77,7 @@ impl BspData {
 
 		for ((texture, tex_flags), faces) in grouped_faces {
 			let mut mesh = ExportedMesh { ..Default::default() };
-			mesh.texture = texture.to_string();
+			mesh.texture = texture;
 			mesh.tex_flags = tex_flags;
 
 			for (face_idx, face) in faces {

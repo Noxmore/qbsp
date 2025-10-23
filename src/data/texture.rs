@@ -14,13 +14,19 @@ use crate::{
 	BspData, BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 };
 
+/// Stack-allocated string the longest a texture name can be.
+pub type TextureName = FixedStr<32>;
+
+/// Stack-allocated string the longest an embedded texture name can be.
+pub type EmbeddedTextureName = FixedStr<16>;
+
 impl BspData {
 	/// Helper function to get a texture name from a [`BspTexInfo`] without worrying about format.
-	pub fn get_texture_name<'a>(&'a self, tex_info: &'a BspTexInfo) -> Option<&'a str> {
+	pub fn get_texture_name<'a>(&'a self, tex_info: &'a BspTexInfo) -> Option<TextureName> {
 		if let Some(extra_info) = &tex_info.extra_info.0 {
-			Some(extra_info.name.as_str())
+			Some(extra_info.name)
 		} else if let Some(texture_idx) = tex_info.texture_idx.0 {
-			Some(self.textures.get(texture_idx as usize).and_then(Option::as_ref)?.header.name.as_str())
+			Some(self.textures.get(texture_idx as usize).and_then(Option::as_ref)?.header.name.extend())
 		} else {
 			None
 		}
@@ -388,7 +394,7 @@ impl BspValue for BspMipTexture {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspTextureHeader {
-	pub name: FixedStr<16>,
+	pub name: EmbeddedTextureName,
 
 	pub width: u32,
 	pub height: u32,
