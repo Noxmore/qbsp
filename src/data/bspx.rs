@@ -14,7 +14,7 @@ use qbsp_macros::BspValue;
 use crate::{
 	data::{
 		lighting::{BspLighting, LightmapStyle},
-		nodes::{BoundingBox, ShortBsp29LeafContents},
+		nodes::{FloatBoundingBox, ShortBsp29LeafContents},
 		texture::PlanarTextureProjection,
 		util::{BspVariableArray, FixedStr},
 		LightmapOffset,
@@ -309,7 +309,7 @@ pub struct ModelBrushes {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModelBrush {
-	pub bound: BoundingBox,
+	pub bound: FloatBoundingBox,
 	pub contents: ShortBsp29LeafContents,
 	/// Non-axial faces only. It's on you to add axial planes via the bounding box.
 	pub planes: BspVariableArray<ModelBrushPlane, u16>,
