@@ -5,7 +5,7 @@ use glam::Vec3;
 use crate::{
 	data::{
 		nodes::{BspLeafContentFlags, BspNodeRef},
-		visdata::VisdataRef,
+		visdata::VisDataRef,
 	},
 	util::{self, VisdataIter},
 	BspData,
@@ -98,8 +98,8 @@ impl BspData {
 	pub fn potentially_visible_set(&self, leaf_idx: usize) -> Option<VisResult<'_>> {
 		let vis_offset = self.leaves.get(leaf_idx)?.visdata;
 		let map_to_ref: fn(VisdataIter) -> VisResult = match vis_offset {
-			VisdataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
-			VisdataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
+			VisDataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
+			VisDataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
 		};
 
 		Some(map_to_ref(util::calculate_visdata_indices(
@@ -131,8 +131,8 @@ impl BspData {
 	pub fn potentially_audible_set(&self, leaf_idx: usize) -> Option<VisResult<'_>> {
 		let vis_offset = self.leaves.get(leaf_idx)?.visdata;
 		let map_to_ref: fn(VisdataIter) -> VisResult = match vis_offset {
-			VisdataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
-			VisdataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
+			VisDataRef::Cluster(_) => |iter| VisResult::Clusters(iter),
+			VisDataRef::Offset(_) => |iter| VisResult::LeafIndices(iter),
 		};
 
 		Some(map_to_ref(util::calculate_visdata_indices(

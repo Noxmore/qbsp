@@ -1,7 +1,7 @@
 //! Data definitions for the BSP node tree.
 
 use crate::{
-	data::{util::UBspValue, visdata::VisdataRef},
+	data::{util::UBspValue, visdata::VisDataRef},
 	BspParseError,
 };
 #[cfg(feature = "bevy_reflect")]
@@ -410,7 +410,7 @@ pub struct BspLeaf {
 	/// visdata for this leaf starts. For BSP38, this is a "cluster". Leafs with the same cluster
 	/// should be put within the same model, and are considered potentially visible or not as a
 	/// group.
-	pub visdata: VisdataRef,
+	pub visdata: VisDataRef,
 
 	pub area: BspArea,
 

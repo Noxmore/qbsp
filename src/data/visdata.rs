@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum VisdataRef {
+pub enum VisDataRef {
 	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
 	/// See [`BspVisData`]. The `offsets` field can be used to get the actual
 	/// offsets into the visdata array.
@@ -24,30 +24,30 @@ pub enum VisdataRef {
 	Offset(i32),
 }
 
-impl VisdataRef {
+impl VisDataRef {
 	/// If the inner value is `-1`, this leaf's visdata is invalid.
 	pub fn is_empty(&self) -> bool {
 		match *self {
-			VisdataRef::Cluster(val) => val == -1,
-			VisdataRef::Offset(val) => val == -1,
+			VisDataRef::Cluster(val) => val == -1,
+			VisDataRef::Offset(val) => val == -1,
 		}
 	}
 }
 
-impl BspVariableValue for VisdataRef {
+impl BspVariableValue for VisDataRef {
 	type Bsp29 = i32;
 	type Bsp2 = i32;
 	type Bsp30 = i32;
 	type Bsp38 = i16;
 }
 
-impl From<i16> for VisdataRef {
+impl From<i16> for VisDataRef {
 	fn from(value: i16) -> Self {
 		Self::Cluster(value)
 	}
 }
 
-impl From<i32> for VisdataRef {
+impl From<i32> for VisDataRef {
 	fn from(value: i32) -> Self {
 		Self::Offset(value)
 	}
@@ -86,16 +86,16 @@ pub struct BspVisData {
 }
 
 impl BspVisData {
-	pub fn pvs(&self, vis_ref: VisdataRef) -> Option<&[u8]> {
+	pub fn pvs(&self, vis_ref: VisDataRef) -> Option<&[u8]> {
 		match vis_ref {
-			VisdataRef::Cluster(cluster) => {
+			VisDataRef::Cluster(cluster) => {
 				let offsets = self.vis_data_offsets.as_ref()?;
 
 				let BspClusterOffsets { pvs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
 
 				self.visdata.get(*pvs as usize..)
 			}
-			VisdataRef::Offset(vis_leaf) => {
+			VisDataRef::Offset(vis_leaf) => {
 				if self.vis_data_offsets.is_some() {
 					return None;
 				}
@@ -105,16 +105,16 @@ impl BspVisData {
 		}
 	}
 
-	pub fn phs(&self, vis_ref: VisdataRef) -> Option<&[u8]> {
+	pub fn phs(&self, vis_ref: VisDataRef) -> Option<&[u8]> {
 		match vis_ref {
-			VisdataRef::Cluster(cluster) => {
+			VisDataRef::Cluster(cluster) => {
 				let offsets = self.vis_data_offsets.as_ref()?;
 
 				let BspClusterOffsets { phs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
 
 				self.visdata.get(*phs as usize..)
 			}
-			VisdataRef::Offset(vis_leaf) => {
+			VisDataRef::Offset(vis_leaf) => {
 				if self.vis_data_offsets.is_some() {
 					return None;
 				}
