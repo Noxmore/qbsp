@@ -152,6 +152,10 @@ impl<const N: usize> BspValue for FixedStr<N> {
 }
 
 impl<const N: usize> FixedStr<N> {
+	pub const EMPTY: Self = Self { data: [0; N] };
+	/// Makes getting N when behind a type alias easier.
+	pub const MAX_LEN: usize = N;
+
 	pub fn new(mut data: [u8; N]) -> Result<Self, std::str::Utf8Error> {
 		// Clear any garbage after the '\0' terminator.
 		if let Some(index) = data.iter().position(|b| *b == 0) {
@@ -161,9 +165,52 @@ impl<const N: usize> FixedStr<N> {
 		Ok(Self { data })
 	}
 
+	/// Calculates string length by finding first null byte. That means this is `O(N)` worst-case.
+	pub fn len(&self) -> usize {
+		for i in 0..N {
+			if self.data[i] == 0 {
+				return i;
+			}
+		}
+		N
+	}
+
+	pub fn is_empty(&self) -> bool {
+		self == &Self::EMPTY
+	}
+
 	pub fn as_str(&self) -> &str {
-		// SAFETY: This is checked when a FixedStr is created
+		// SAFETY: This is checked when a FixedStr is created.
 		unsafe { std::str::from_utf8_unchecked(&self.data) }.trim_end_matches('\0')
+	}
+
+	pub fn as_bytes(&self) -> &[u8] {
+		&self.data
+	}
+
+	pub fn to_bytes(self) -> [u8; N] {
+		self.data
+	}
+
+	/// Copies this string to a new [`FixedStr`] of length `NEW_N`. `NEW_N` must be as large or larger than `N`.
+	pub fn extend<const NEW_N: usize>(&self) -> FixedStr<NEW_N> {
+		assert!(NEW_N >= N);
+
+		let mut data = [0; NEW_N];
+		data[..N].copy_from_slice(&self.data);
+
+		FixedStr { data }
+	}
+
+	pub fn truncate<const NEW_N: usize>(&self) -> Option<FixedStr<NEW_N>> {
+		if self.len() > NEW_N {
+			return None;
+		}
+
+		let mut data = [0; NEW_N];
+		data.copy_from_slice(&self.data[..NEW_N]);
+
+		Some(FixedStr { data })
 	}
 }
 
@@ -179,6 +226,12 @@ impl<const N: usize> std::fmt::Display for FixedStr<N> {
 	}
 }
 
+impl<const N: usize> Default for FixedStr<N> {
+	fn default() -> Self {
+		Self { data: [0; N] }
+	}
+}
+
 impl<const N: usize> FromStr for FixedStr<N> {
 	type Err = ();
 
@@ -188,7 +241,7 @@ impl<const N: usize> FromStr for FixedStr<N> {
 		}
 		let mut data = [0; N];
 
-		#[allow(clippy::manual_memcpy)]
+		#[expect(clippy::manual_memcpy)]
 		for i in 0..s.len() {
 			data[i] = s.as_bytes()[i];
 		}
@@ -235,13 +288,45 @@ mod fixed_str_tests {
 	use super::FixedStr;
 
 	#[test]
-	fn fixed_str_from_str() {
+	fn from_str() {
 		assert!(FixedStr::<8>::from_str("12345678").is_ok());
 		assert!(FixedStr::<8>::from_str("123456789").is_err());
 	}
 
 	#[test]
-	fn fixed_str_from_null_garbage() {
+	fn from_null_garbage() {
 		assert!(FixedStr::<8>::new([b'+', b's', b'k', b'y', 0, b'+', b'v', 189]).is_ok());
+	}
+
+	#[test]
+	fn calculate_len() {
+		assert_eq!(FixedStr::<8>::from_str("").unwrap().len(), 0);
+		assert_eq!(FixedStr::<8>::from_str("foo").unwrap().len(), 3);
+		assert_eq!(FixedStr::<8>::from_str("12345678").unwrap().len(), 8);
+	}
+
+	#[test]
+	fn extend() {
+		assert_eq!(
+			FixedStr::<3>::from_str("foo").unwrap().extend::<32>(),
+			FixedStr::<32>::from_str("foo").unwrap()
+		);
+		assert_eq!(
+			FixedStr::<4>::from_str("foo").unwrap().extend::<8>(),
+			FixedStr::<8>::from_str("foo").unwrap()
+		);
+	}
+
+	#[test]
+	fn truncate() {
+		assert_eq!(
+			FixedStr::<8>::from_str("foo").unwrap().truncate::<4>(),
+			Some(FixedStr::<4>::from_str("foo").unwrap())
+		);
+		assert_eq!(
+			FixedStr::<8>::from_str("foo").unwrap().truncate::<3>(),
+			Some(FixedStr::<3>::from_str("foo").unwrap())
+		);
+		assert!(FixedStr::<8>::from_str("foo").unwrap().truncate::<2>().is_none());
 	}
 }
