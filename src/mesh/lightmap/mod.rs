@@ -129,7 +129,7 @@ impl BspData {
 					LightmapInfo {
 						uvs,
 						extents,
-						lightmap_offset: lm_info.offset,
+						lightmap_offset: lm_info.offset.pixels,
 					}
 				}
 				None => {

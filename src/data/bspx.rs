@@ -16,7 +16,7 @@ use crate::{
 		lighting::{BspLighting, LightmapStyle},
 		nodes::{BoundingBox, ShortBsp29LeafContents},
 		texture::PlanarTextureProjection,
-		util::{BspVariableArray, FixedStr},
+		util::{BspVariableArray, FixedStr}, LightmapOffset,
 	},
 	reader::{BspByteReader, BspParseContext, BspValue},
 	BspParseError, BspParseResultDoingJobExt, BspResult, LumpEntry,
@@ -331,7 +331,7 @@ pub type DecoupledLightmaps = Vec<DecoupledLightmap>;
 pub struct DecoupledLightmap {
 	pub size: U16Vec2,
 	/// Offset into the lighting lump, or -1
-	pub offset: i32,
+	pub offset: LightmapOffset,
 
 	pub projection: PlanarTextureProjection,
 }
