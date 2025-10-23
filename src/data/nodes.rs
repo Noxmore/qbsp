@@ -294,7 +294,7 @@ impl From<ShortBsp29LeafContents> for BspLeafContentFlags {
 	}
 }
 
-/// If loading a BSP2, parses a float-based bounding box, else if BSP29, parses a short-based bounding box.
+/// If loading a BSP2, parses a float-based bounding box, otherwise parses a short-based bounding box.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
