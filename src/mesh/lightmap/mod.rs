@@ -159,8 +159,6 @@ impl BspData {
 				lightmap_uvs.insert(
 					face_idx as u32,
 					if tex_info.flags.texture_flags.unwrap_or_default() == BspTexFlags::Normal {
-						// TODO: For BSP3x (GoldSrc/Quake 2), we should look at the texture name
-						// to figure out the texture flags.
 						empty_reserved_pixel.get_uvs(&mut packer, view)?
 					} else {
 						special_reserved_pixel.get_uvs(&mut packer, view)?
