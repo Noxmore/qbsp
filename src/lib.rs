@@ -306,7 +306,7 @@ pub struct BspData {
 	/// Index into this vector via [`BspLeaf::leaf_brushes`].
 	///
 	/// If this isn't a Quake 2 map, this vector should be empty.
-	pub leaf_brushes: Vec<u16>,
+	pub leaf_brushes: Vec<UBspValue>,
 	/// Indices into the face list, pointed to by leaves.
 	pub mark_surfaces: Vec<UBspValue>,
 	pub edges: Vec<BspEdge>,

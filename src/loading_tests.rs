@@ -243,13 +243,13 @@ fn validate_bounds() {
 		}
 
 		for brush_side in &data.brush_sides {
-			assert!(brush_side.plane_idx < data.planes.len().max(1) as u16);
-			assert!(brush_side.tex_info_idx < data.tex_info.len().max(1) as u16);
+			assert!(brush_side.plane_idx.0 < data.planes.len().max(1) as u32);
+			assert!(brush_side.tex_info_idx.0 < data.tex_info.len().max(1) as u32);
 		}
 
 		assert_eq!(!data.leaf_brushes.is_empty(), data.parse_ctx.format == BspFormat::BSP38);
 		for leaf_brush in data.leaf_brushes.iter().copied() {
-			assert!(leaf_brush < data.brushes.len().max(1) as u16);
+			assert!(leaf_brush.0 < data.brushes.len().max(1) as u32);
 		}
 	}
 }

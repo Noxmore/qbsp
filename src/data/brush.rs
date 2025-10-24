@@ -5,7 +5,7 @@ use bevy_reflect::Reflect;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::data::nodes::BspLeafContentFlags;
+use crate::data::{nodes::BspLeafContentFlags, util::UBspValue};
 
 /// A brush stored inside a Quake 2 BSP.
 #[derive(BspValue, Debug, Clone)]
@@ -22,6 +22,6 @@ pub struct BspBrush {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspBrushSide {
-	pub plane_idx: u16,
-	pub tex_info_idx: u16,
+	pub plane_idx: UBspValue,
+	pub tex_info_idx: UBspValue,
 }
