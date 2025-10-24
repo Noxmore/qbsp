@@ -278,10 +278,12 @@ pub struct BspData {
 	pub lighting: Option<BspLighting>,
 	pub clip_nodes: Vec<BspClipNode>,
 	pub leaves: Vec<BspLeaf>,
-	// TODO: Leaf brushes, used for collision in Quake 2 (BSP38) maps as they don't use hulls.
-	// We should implement this but for now, `bevy_trenchbroom` can recalculate collision from
-	// the visible mesh.
-	// pub leaf_brushes: (),
+	/// Used for collision in Quake 2 (BSP38) maps as they don't use hulls.
+	/// Indexes into the [`brushes`](Self::brushes) vector.
+	/// Index into this vector via [`BspLeaf::leaf_brushes`].
+	///
+	/// If this isn't a Quake 2 map, this vector should be empty.
+	pub leaf_brushes: Vec<u16>,
 	/// Indices into the face list, pointed to by leaves.
 	pub mark_surfaces: Vec<UBspValue>,
 	pub edges: Vec<BspEdge>,
@@ -365,6 +367,11 @@ impl BspData {
 				Vec::new()
 			},
 			leaves: read_lump(bsp, lump_dir.leaves, "leaves", &ctx)?,
+			leaf_brushes: if let Some(lump_entry) = *lump_dir.leaf_brushes {
+				read_lump(bsp, lump_entry, "leaf brushes", &ctx)?
+			} else {
+				Vec::new()
+			},
 			mark_surfaces: read_lump(bsp, lump_dir.mark_surfaces, "mark surfaces", &ctx)?,
 			edges: read_lump(bsp, lump_dir.edges, "edges", &ctx)?,
 			surface_edges: read_lump(bsp, lump_dir.surf_edges, "surface edges", &ctx)?,

@@ -3,6 +3,7 @@
 use crate::{
 	data::{lighting::BspLighting, nodes::BspNodeRef},
 	prelude::*,
+	BspFormat,
 };
 
 #[derive(Clone, Copy)]
@@ -193,6 +194,16 @@ fn validate_bounds() {
 			assert!(clip_node.back.leaf().is_some() || (clip_node.back.node().unwrap() as usize) < data.clip_nodes.len().max(1));
 		}
 
+		for leaf in &data.leaves {
+			// TODO: Check `area` when implemented
+
+			validate_range(leaf.face_idx.0, leaf.face_num.0, data.mark_surfaces.len());
+
+			if let Some(leaf_brushes) = &leaf.leaf_brushes {
+				validate_range(leaf_brushes.idx as u32, leaf_brushes.num as u32, data.leaf_brushes.len());
+			}
+		}
+
 		if !data.visibility.visdata.is_empty() {
 			for leaf in &data.leaves {
 				if leaf.visdata.is_empty() {
@@ -233,6 +244,11 @@ fn validate_bounds() {
 		for brush_side in &data.brush_sides {
 			assert!(brush_side.plane_idx < data.planes.len().max(1) as u16);
 			assert!(brush_side.tex_info_idx < data.tex_info.len().max(1) as u16);
+		}
+
+		assert_eq!(!data.leaf_brushes.is_empty(), data.parse_ctx.format == BspFormat::BSP38);
+		for leaf_brush in data.leaf_brushes.iter().copied() {
+			assert!(leaf_brush < data.brushes.len().max(1) as u16);
 		}
 	}
 }
