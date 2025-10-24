@@ -2,7 +2,7 @@
 members = ["qbsp_macros", "tools/*"]
 
 [workspace.package]
-version = "0.8.1"
+version = "0.9.0"
 description = "Rust crate for parsing and operating with Quake 1, 2, and GoldSrc BSP files"
 edition = "2021"
 authors = ["Noxmore"]
@@ -25,7 +25,7 @@ license.workspace = true
 
 
 [dependencies]
-qbsp_macros = { version = "0.8.1", path = "qbsp_macros" }
+qbsp_macros = { version = "0.9.0", path = "qbsp_macros" }
 
 bitflags = "2.10"
 glam = "0.*"
