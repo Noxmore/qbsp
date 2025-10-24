@@ -56,6 +56,7 @@ impl BspVariableValue for Option<PerSizeHulls> {
 	type Bsp2 = PerSizeHulls;
 	type Bsp30 = PerSizeHulls;
 	type Bsp38 = NoField;
+	type Qbism = NoField;
 }
 
 /// Number of visleafs in the model. Quake 2 uses visclusters, and so
@@ -67,6 +68,7 @@ impl BspVariableValue for Option<PerSizeHulls> {
 #[bsp2(u32)]
 #[bsp30(u32)]
 #[bsp38(NoField)]
+#[qbism(NoField)]
 pub struct VisleafsField(pub Option<u32>);
 
 /// A single model in the BSP file. Model 0 is worldspawn, other models

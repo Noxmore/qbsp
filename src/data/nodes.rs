@@ -61,6 +61,7 @@ impl BspValue for BspNodeRef<u16> {
 #[bsp2(BspNodeRef<u32>)]
 #[bsp30(BspNodeRef<u16>)]
 #[bsp38(BspNodeRef<u32>)]
+#[qbism(BspNodeRef<u32>)]
 pub struct BspNodeSubRef(BspNodeRef);
 
 impl From<BspNodeRef<u16>> for BspNodeRef<u32> {
@@ -326,6 +327,7 @@ impl BspVariableValue for BoundingBox {
 	type Bsp2 = FloatBoundingBox;
 	type Bsp30 = ShortBoundingBox;
 	type Bsp38 = ShortBoundingBox;
+	type Qbism = FloatBoundingBox;
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -382,14 +384,34 @@ pub struct BspClipNode {
 	pub back: BspNodeSubRef,
 }
 
-#[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[bsp29(NoField)]
-#[bsp2(NoField)]
-#[bsp30(NoField)]
-#[bsp38(u16)]
-pub struct BspArea(pub Option<u16>);
+pub struct BspAreaIdx(pub Option<u32>);
+
+impl BspVariableValue for BspAreaIdx {
+	type Bsp29 = NoField;
+	type Bsp2 = NoField;
+	type Bsp30 = NoField;
+	type Bsp38 = u16;
+	type Qbism = u32;
+}
+
+impl From<u16> for BspAreaIdx {
+	fn from(value: u16) -> Self {
+		Self(Some(value as u32))
+	}
+}
+impl From<u32> for BspAreaIdx {
+	fn from(value: u32) -> Self {
+		Self(Some(value))
+	}
+}
+impl From<NoField> for BspAreaIdx {
+	fn from(_: NoField) -> Self {
+		Self(None)
+	}
+}
 
 #[derive(BspVariableValue, Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
@@ -398,6 +420,7 @@ pub struct BspArea(pub Option<u16>);
 #[bsp2(Bsp29LeafContents)]
 #[bsp30(BspLeafContentFlags)]
 #[bsp38(BspLeafContentFlags)]
+#[qbism(BspLeafContentFlags)]
 pub struct BspLeafContents(pub BspLeafContentFlags);
 
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -412,7 +435,7 @@ pub struct BspLeaf {
 	/// group.
 	pub visdata: VisDataRef,
 
-	pub area: BspArea,
+	pub area: BspAreaIdx,
 
 	/// The AABB bounding box of this leaf.
 	pub bound: BoundingBox,
@@ -430,8 +453,8 @@ pub struct BspLeaf {
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspLeafBrushes {
-	pub idx: u16,
-	pub num: u16,
+	pub idx: UBspValue,
+	pub num: UBspValue,
 }
 
 impl BspVariableValue for Option<BspLeafBrushes> {
@@ -439,6 +462,7 @@ impl BspVariableValue for Option<BspLeafBrushes> {
 	type Bsp2 = NoField;
 	type Bsp30 = NoField;
 	type Bsp38 = BspLeafBrushes;
+	type Qbism = BspLeafBrushes;
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]
@@ -457,6 +481,7 @@ impl BspVariableValue for Option<BspAmbience> {
 	type Bsp30 = BspAmbience;
 	// Quake 2 does not have the `ambience` field.
 	type Bsp38 = NoField;
+	type Qbism = NoField;
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]

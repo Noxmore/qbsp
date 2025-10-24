@@ -6,7 +6,7 @@ use syn::*;
 /// the type, in order to convert from the individual format types, and will implement `{Deref,DerefMut}<Target = (inner field type)>`. Specify the variant types per
 /// BSP format with `#[bsp2(..)]`, `#[bsp29(..)]`, `#[bsp30(..)]` and `#[bsp38(..)]` annotations respectively. All format variants _must_ be specified, if a
 /// field does not exist in a format use `NoField` and implement `From<NoField>` for the inner field type.
-#[proc_macro_derive(BspVariableValue, attributes(bsp2, bsp29, bsp30, bsp38))]
+#[proc_macro_derive(BspVariableValue, attributes(bsp2, bsp29, bsp30, bsp38, qbism))]
 pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	let ident = input.ident;
@@ -22,6 +22,7 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 				let mut bsp2_type: Option<Type> = None;
 				let mut bsp30_type: Option<Type> = None;
 				let mut bsp38_type: Option<Type> = None;
+				let mut qbism_type: Option<Type> = None;
 
 				for attr in input.attrs.iter() {
 					let Ok(bsp_repr) = attr.meta.require_list() else {
@@ -36,6 +37,8 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 						bsp30_type = Some(parse2(bsp_repr.tokens.clone()).expect("Argument to #[bsp30(..)] must be a type"));
 					} else if compare_path(&bsp_repr.path, "bsp38") {
 						bsp38_type = Some(parse2(bsp_repr.tokens.clone()).expect("Argument to #[bsp38(..)] must be a type"));
+					} else if compare_path(&bsp_repr.path, "qbism") {
+						qbism_type = Some(parse2(bsp_repr.tokens.clone()).expect("Argument to #[qbism(..)] must be a type"));
 					}
 				}
 
@@ -51,6 +54,9 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 				let Some(bsp38_type) = bsp38_type else {
 					panic!("#[bsp38({{type}})] must be specified");
 				};
+				let Some(qbism_type) = qbism_type else {
+					panic!("#[qbism({{type}})] must be specified");
+				};
 				(
 					quote! {
 						impl ::qbsp::reader::BspVariableValue for #ident {
@@ -58,6 +64,7 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 							type Bsp2 = #bsp2_type;
 							type Bsp30 = #bsp30_type;
 							type Bsp38 = #bsp38_type;
+							type Qbism = #qbism_type;
 						}
 					},
 					field_inner_type,

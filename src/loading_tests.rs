@@ -201,7 +201,7 @@ fn validate_bounds() {
 			validate_range(leaf.face_idx.0, leaf.face_num.0, data.mark_surfaces.len());
 
 			if let Some(leaf_brushes) = &leaf.leaf_brushes {
-				validate_range(leaf_brushes.idx as u32, leaf_brushes.num as u32, data.leaf_brushes.len());
+				validate_range(leaf_brushes.idx.0, leaf_brushes.num.0, data.leaf_brushes.len());
 			}
 		}
 

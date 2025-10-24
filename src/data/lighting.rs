@@ -26,7 +26,7 @@ impl BspValue for BspLighting {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
 			BspFormat::BSP2 | BspFormat::BSP29 => Ok(Self::White(reader.read_rest().to_vec())),
-			BspFormat::BSP30 | BspFormat::BSP38 => {
+			BspFormat::BSP30 | BspFormat::BSP38 | BspFormat::BSP38Qbism => {
 				let total_len = reader.len();
 				let (rgb_pixels, rest) = reader.read_bytes(total_len)?.as_chunks::<3>();
 				if !rest.is_empty() {
@@ -127,6 +127,7 @@ impl BspVariableValue for LightmapOffset {
 	type Bsp2 = PixelLightmapOffset;
 	type Bsp30 = ByteLightmapOffset;
 	type Bsp38 = ByteLightmapOffset;
+	type Qbism = ByteLightmapOffset;
 }
 
 /// An offset specified in number of pixels.

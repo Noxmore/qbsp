@@ -86,8 +86,8 @@ pub enum BspParseError {
 	InvalidString { index: usize, sequence: Vec<u8> },
 	#[error("Wrong magic number! Expected {expected}, found \"{}\"", display_magic_number(found))]
 	WrongMagicNumber { found: [u8; 4], expected: &'static str },
-	#[error("Unsupported IBSP version! Expected {expected}, found {found}")]
-	UnsupportedIbspVersion { found: u32, expected: &'static str },
+	#[error("Unsupported BSP version! Expected {expected}, found {found}")]
+	UnsupportedBspVersion { found: u32, expected: &'static str },
 	#[error("Invalid color data, size {0} is not devisable by 3!")]
 	ColorDataSizeNotDevisableBy3(usize),
 	#[error("Invalid value: {value}, acceptable:\n{acceptable}")]
@@ -157,6 +157,9 @@ pub enum BspFormat {
 
 	/// Quake 2 format.
 	BSP38,
+
+	/// Quake 2 format with expanded limits, similar to what BSP2 is to BSP29.
+	BSP38Qbism,
 }
 impl BspFormat {
 	/// Returns the character used to denote liquids by prefixing the texture name in the engine that uses this format.
@@ -166,7 +169,7 @@ impl BspFormat {
 			Self::BSP2 | Self::BSP29 => Some('*'),
 			// https://developer.valvesoftware.com/wiki/Texture_prefixes
 			Self::BSP30 => Some('!'),
-			Self::BSP38 => None,
+			Self::BSP38 | Self::BSP38Qbism => None,
 		}
 	}
 }
@@ -185,7 +188,17 @@ impl BspValue for BspFormat {
 				// Currently, we only support version 38, the Quake2 format.
 				match version {
 					38 => Ok(Self::BSP38),
-					_ => Err(BspParseError::UnsupportedIbspVersion {
+					_ => Err(BspParseError::UnsupportedBspVersion {
+						found: version,
+						expected: "38 (Quake 2)",
+					}),
+				}
+			}
+			b"QBSP" => {
+				let version: u32 = reader.read()?;
+				match version {
+					38 => Ok(Self::BSP38Qbism),
+					_ => Err(BspParseError::UnsupportedBspVersion {
 						found: version,
 						expected: "38 (Quake 2)",
 					}),
@@ -210,6 +223,7 @@ impl std::fmt::Display for BspFormat {
 			BspFormat::BSP29 => write!(f, "BSP29"),
 			BspFormat::BSP30 => write!(f, "BSP30"),
 			BspFormat::BSP38 => write!(f, "BSP38"),
+			BspFormat::BSP38Qbism => write!(f, "BSP38 (Qbism)"),
 		}
 	}
 }

@@ -87,6 +87,7 @@ impl Palette {
 #[bsp2(u32)]
 #[bsp30(u32)]
 #[bsp38(NoField)]
+#[qbism(NoField)]
 pub struct TextureIdxField(pub Option<u32>);
 
 #[derive(BspVariableValue, Debug, Clone, PartialEq, Eq)]
@@ -96,6 +97,7 @@ pub struct TextureIdxField(pub Option<u32>);
 #[bsp2(NoField)]
 #[bsp30(NoField)]
 #[bsp38(BspTexQ2Info)]
+#[qbism(BspTexQ2Info)]
 pub struct Q2InfoField(pub Option<BspTexQ2Info>);
 
 #[derive(BspValue, Debug, Clone)]
@@ -176,6 +178,7 @@ impl BspVariableValue for BspTexInfoFlags {
 	type Bsp2 = BspTexFlags;
 	type Bsp30 = BspSurfaceFlags;
 	type Bsp38 = BspSurfaceFlags;
+	type Qbism = BspSurfaceFlags;
 }
 
 /// Quake 1-style texture flags. Quake 2 ditches this entirely, GoldSrc
@@ -305,6 +308,7 @@ impl PlanarTextureProjection {
 #[bsp2(NoField)]
 #[bsp30(Palette)]
 #[bsp38(NoField)]
+#[qbism(NoField)]
 pub struct Wad3Palette(pub Option<Palette>);
 
 #[derive(Default, Clone)]

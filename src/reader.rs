@@ -187,6 +187,8 @@ pub trait BspVariableValue: Sized {
 	type Bsp30: BspValue + Into<Self>;
 	/// The type of this field for BSP38 (Quake 2). See [Flipcode](https://www.flipcode.com/archives/Quake_2_BSP_File_Format.shtml).
 	type Bsp38: BspValue + Into<Self>;
+	/// The type of this field for BSP38 Qbism (Quake 2 extended format). Doesn't include "Bsp38" in the name to better align the text with neighbors.
+	type Qbism: BspValue + Into<Self>;
 }
 
 impl<T> BspValue for T
@@ -199,6 +201,7 @@ where
 			BspFormat::BSP29 => T::Bsp29::bsp_parse(reader).map(Into::into),
 			BspFormat::BSP30 => T::Bsp30::bsp_parse(reader).map(Into::into),
 			BspFormat::BSP38 => T::Bsp38::bsp_parse(reader).map(Into::into),
+			BspFormat::BSP38Qbism => T::Qbism::bsp_parse(reader).map(Into::into),
 		}
 	}
 
@@ -208,6 +211,7 @@ where
 			BspFormat::BSP29 => T::Bsp29::bsp_struct_size(ctx),
 			BspFormat::BSP30 => T::Bsp30::bsp_struct_size(ctx),
 			BspFormat::BSP38 => T::Bsp38::bsp_struct_size(ctx),
+			BspFormat::BSP38Qbism => T::Qbism::bsp_struct_size(ctx),
 		}
 	}
 }

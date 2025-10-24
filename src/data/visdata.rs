@@ -7,7 +7,7 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	data::util::{BspVariableArray, NoField},
+	data::util::{BspVariableArray, IBspValue, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
 	BspResult,
 };
@@ -19,7 +19,7 @@ pub enum VisDataRef {
 	/// Unlike all other IDTech2-derived formats, Quake 2 uses clusters, like Quake 3 and Source.
 	/// See [`BspVisData`]. The `offsets` field can be used to get the actual
 	/// offsets into the visdata array.
-	Cluster(i16),
+	Cluster(IBspValue),
 	/// A raw offset into the visdata.
 	Offset(i32),
 }
@@ -28,7 +28,7 @@ impl VisDataRef {
 	/// If the inner value is `-1`, this leaf's visdata is invalid.
 	pub fn is_empty(&self) -> bool {
 		match *self {
-			VisDataRef::Cluster(val) => val == -1,
+			VisDataRef::Cluster(val) => val.0 == -1,
 			VisDataRef::Offset(val) => val == -1,
 		}
 	}
@@ -38,11 +38,12 @@ impl BspVariableValue for VisDataRef {
 	type Bsp29 = i32;
 	type Bsp2 = i32;
 	type Bsp30 = i32;
-	type Bsp38 = i16;
+	type Bsp38 = IBspValue;
+	type Qbism = IBspValue;
 }
 
-impl From<i16> for VisDataRef {
-	fn from(value: i16) -> Self {
+impl From<IBspValue> for VisDataRef {
+	fn from(value: IBspValue) -> Self {
 		Self::Cluster(value)
 	}
 }
@@ -71,6 +72,7 @@ pub struct BspClusterOffsets {
 #[bsp29(NoField)]
 #[bsp30(NoField)]
 #[bsp38(BspVariableArray<BspClusterOffsets, u32>)]
+#[qbism(BspVariableArray<BspClusterOffsets, u32>)]
 pub struct BspVisDataOffsets(pub Option<BspVariableArray<BspClusterOffsets, u32>>);
 
 /// The visiblity lump - for pre-BSP38 files, this is just a flat byte vector. For BSP38,
@@ -91,7 +93,7 @@ impl BspVisData {
 			VisDataRef::Cluster(cluster) => {
 				let offsets = self.vis_data_offsets.as_ref()?;
 
-				let BspClusterOffsets { pvs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
+				let BspClusterOffsets { pvs, .. } = offsets.get(cluster.0 as usize)?;
 
 				self.visdata.get(*pvs as usize..)
 			}
@@ -110,7 +112,7 @@ impl BspVisData {
 			VisDataRef::Cluster(cluster) => {
 				let offsets = self.vis_data_offsets.as_ref()?;
 
-				let BspClusterOffsets { phs, .. } = offsets.get(usize::try_from(cluster).ok()?)?;
+				let BspClusterOffsets { phs, .. } = offsets.get(cluster.0 as usize)?;
 
 				self.visdata.get(*phs as usize..)
 			}

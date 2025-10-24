@@ -6,7 +6,7 @@
 Rust crate for parsing, and operating with Quake 1, 2, and GoldSrc BSP files.
 
 ## Features
-- Parsing `.bsp` files with the BSP29 BSP2, BSP30, and BSP38 formats.
+- Parsing `.bsp` files with the BSP29 BSP2, BSP30 BSP38, and Qbism formats.
 - Structured easy access to the bsp data.
 - BSP raycasting.
 - Mesh generation.

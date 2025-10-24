@@ -62,9 +62,10 @@ impl LumpEntry {
 #[bsp29(LumpEntry)]
 #[bsp30(LumpEntry)]
 #[bsp38(NoField)]
+#[qbism(NoField)]
 pub struct PreBsp38LumpEntry(pub Option<LumpEntry>);
 
-/// A `LumpEntry` that only exists for BSP38.
+/// A `LumpEntry` that only exists for BSP38 and Qbism.
 #[derive(BspVariableValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -72,6 +73,7 @@ pub struct PreBsp38LumpEntry(pub Option<LumpEntry>);
 #[bsp29(NoField)]
 #[bsp30(NoField)]
 #[bsp38(LumpEntry)]
+#[qbism(LumpEntry)]
 pub struct Bsp38OnlyLumpEntry(pub Option<LumpEntry>);
 
 /// Contains the list of lump entries
@@ -182,7 +184,7 @@ impl BspValue for LumpDirectory {
 
 		let mut bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
 		// I'm guessing this is because of the added version number? This code certainly doesn't look very good, but it seems to work.
-		if reader.ctx.format == BspFormat::BSP38 {
+		if matches!(reader.ctx.format, BspFormat::BSP38 | BspFormat::BSP38Qbism) {
 			bspx_offset += 3;
 		}
 

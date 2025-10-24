@@ -89,6 +89,7 @@ impl<T, const N: usize> From<NoField> for Option<[T; N]> {
 #[bsp2(u32)]
 #[bsp30(u16)]
 #[bsp38(u16)]
+#[qbism(u32)]
 pub struct UBspValue(pub u32);
 
 /// A signed variable integer parsed from a BSP. i32 when parsing BSP2, i16 when parsing BSP29.
@@ -101,6 +102,7 @@ pub struct UBspValue(pub u32);
 #[bsp2(i32)]
 #[bsp30(i16)]
 #[bsp38(i16)]
+#[qbism(i32)]
 pub struct IBspValue(pub i32);
 
 /// A variable length array in the format of `N` (count) then `[T; N]` (elements).
