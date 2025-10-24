@@ -34,7 +34,8 @@ macro_rules! testing_bsp {
 static EXAMPLE_BSPS: &[TestingBsp] = &[
 	testing_bsp!("example-halflife.bsp"),
 	testing_bsp!("example-quake2.bsp"),
-	testing_bsp!("example.bsp"),
+	testing_bsp!("example-bsp29.bsp"),
+	testing_bsp!("example-bsp2.bsp"),
 ];
 
 static TESTING_BSPS: &[TestingBsp] = &[
