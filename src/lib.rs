@@ -215,7 +215,7 @@ impl BspValue for BspFormat {
 			}
 			_ => Err(BspParseError::WrongMagicNumber {
 				found: magic_number,
-				expected: "BSP2, 0x1D000000 (BSP29), 0x1E000000 (BSP30), or IBSP (BSP38)",
+				expected: "BSP2, 0x1D000000 (BSP29), 0x1E000000 (BSP30), IBSP (BSP38), or QBSP (QBISM)",
 			}),
 		}
 	}
