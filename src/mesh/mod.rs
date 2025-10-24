@@ -43,7 +43,7 @@ pub struct ExportedMesh {
 	/// All faces in the bsp data used to create this mesh.
 	pub faces: Vec<u32>,
 
-	pub texture: TextureName,
+	pub texture: Option<TextureName>,
 }
 
 /// The output of [`BspData::mesh_model`]. Contains one mesh for each texture used in the model.
@@ -60,12 +60,14 @@ impl BspData {
 		let model = &self.models[model_idx];
 
 		// Group faces by texture, also storing index for packing use
-		let mut grouped_faces: HashMap<(TextureName, BspTexFlags), Vec<(u32, &BspFace)>> = Default::default();
+		type MaterialKey = (Option<TextureName>, BspTexFlags);
+		type FacesWithIndex<'a> = Vec<(u32, &'a BspFace)>;
+		let mut grouped_faces: HashMap<MaterialKey, FacesWithIndex> = Default::default();
 
 		for i in model.first_face..model.first_face + model.num_faces {
 			let face = &self.faces[i as usize];
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
-			let Some(name) = self.get_texture_name(tex_info) else { continue };
+			let name = self.get_texture_name(tex_info);
 
 			grouped_faces
 				.entry((name, tex_info.flags.texture_flags.unwrap_or_default()))
