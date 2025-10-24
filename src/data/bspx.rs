@@ -61,7 +61,7 @@ impl BspValue for BspxDirectory {
 		let mut inner = HashMap::new();
 
 		for i in 0..num_lumps {
-			let entry: BspxLumpEntry = reader.read().job(format!("lump entry {i}/{num_lumps}"))?;
+			let entry: BspxLumpEntry = reader.read().job(|| format!("lump entry {i}/{num_lumps}"))?;
 
 			inner.insert(entry.name, entry.entry);
 		}
@@ -115,7 +115,7 @@ impl BspxData {
 
 		let mut i: usize = 0;
 		while reader.in_bounds() {
-			let brushes = match reader.read().job(format!("Parsing BRUSHLIST BSPX lump element {i}")) {
+			let brushes = match reader.read().job(|| format!("Parsing BRUSHLIST BSPX lump element {i}")) {
 				Ok(v) => v,
 				Err(err) => return Some(Err(err)),
 			};
@@ -135,7 +135,7 @@ impl BspxData {
 		let mut lm_infos = DecoupledLightmaps::with_capacity(entries_count);
 
 		for i in 0..entries_count {
-			let lm_info = match reader.read().job(format!("Parsing DECOUPLED_LM BSPX lump element {i}")) {
+			let lm_info = match reader.read().job(|| format!("Parsing DECOUPLED_LM BSPX lump element {i}")) {
 				Ok(v) => v,
 				Err(err) => return Some(Err(err)),
 			};

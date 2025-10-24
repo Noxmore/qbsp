@@ -125,16 +125,25 @@ impl BspParseError {
 
 pub type BspResult<T> = Result<T, BspParseError>;
 
-pub trait BspParseResultDoingJobExt {
+pub trait BspParseResultDoingJobExt<T> {
 	/// Like `map_err`, but specifically for adding messages to BSP errors to tell the user exactly what was going on when the error occurred.
-	fn job(self, job: impl ToString) -> Self;
+	fn job(self, job: T) -> Self;
 }
-impl<T> BspParseResultDoingJobExt for BspResult<T> {
+impl<T> BspParseResultDoingJobExt<&str> for BspResult<T> {
 	#[inline]
-	fn job(self, job: impl ToString) -> Self {
+	fn job(self, job: &str) -> Self {
 		match self {
 			Ok(v) => Ok(v),
-			Err(err) => Err(BspParseError::DoingJob(job.to_string(), Box::new(err))),
+			Err(err) => Err(BspParseError::DoingJob(job.to_owned(), Box::new(err))),
+		}
+	}
+}
+impl<T, F: FnOnce() -> String> BspParseResultDoingJobExt<F> for BspResult<T> {
+	#[inline]
+	fn job(self, job: F) -> Self {
+		match self {
+			Ok(v) => Ok(v),
+			Err(err) => Err(BspParseError::DoingJob((job)(), Box::new(err))),
 		}
 	}
 }
@@ -243,7 +252,7 @@ pub fn read_lump<T: BspValue>(data: &[u8], entry: LumpEntry, lump_name: &'static
 	let mut out = Vec::with_capacity(lump_entries);
 
 	for i in 0..lump_entries {
-		out.push(reader.read().job(format!("Parsing {lump_name} lump entry {i}"))?);
+		out.push(reader.read().job(|| format!("Parsing {lump_name} lump entry {i}"))?);
 	}
 
 	Ok(out)

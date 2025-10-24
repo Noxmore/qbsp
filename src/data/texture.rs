@@ -359,7 +359,7 @@ impl BspValue for BspMipTexture {
 					Some(
 						reader
 							.read_bytes((header.width as usize $($($res_operator)+)?) * (header.height as usize $($($res_operator)+)?))
-							.job(format!(concat!("Reading texture (", $res, "res) with header {:#?}"), header))?
+							.job(|| format!(concat!("Reading texture (", $res, "res) with header {:#?}"), header))?
 							.to_vec(),
 					)
 				}
