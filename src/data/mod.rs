@@ -7,7 +7,7 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::reader::{BspByteReader, BspParseContext, BspValue};
-use crate::{data::util::NoField, BspFormat, BspParseError, BspParseResultDoingJobExt, BspResult};
+use crate::{data::util::NoField, BspParseError, BspParseResultDoingJobExt, BspResult};
 
 pub mod brush;
 pub mod bspx;
@@ -182,11 +182,11 @@ impl BspValue for LumpDirectory {
 			bspx: bspx::BspxDirectory::default(),
 		};
 
-		let mut bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
-		// I'm guessing this is because of the added version number? This code certainly doesn't look very good, but it seems to work.
-		if matches!(reader.ctx.format, BspFormat::BSP38 | BspFormat::BSP38Qbism) {
+		let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
+		// Unhelpful hack, see https://github.com/Noxmore/qbsp/issues/12
+		/* if matches!(reader.ctx.format, BspFormat::BSP38 | BspFormat::BSP38Qbism) {
 			bspx_offset += 3;
-		}
+		} */
 
 		match reader.with_pos(bspx_offset as usize).read() {
 			Ok(bspx_dir) => dir.bspx = bspx_dir,

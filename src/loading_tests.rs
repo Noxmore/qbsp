@@ -121,7 +121,7 @@ fn prase_bspx_lumps() {
 		};
 
 		// For nice error messages
-		if let Err(err) = data.bspx.parse_brush_list(&data.parse_ctx).unwrap() {
+		if let Some(Err(err)) = data.bspx.parse_brush_list(&data.parse_ctx) {
 			panic!("{err}");
 		}
 		if let Err(err) = data.bspx.parse_decoupled_lm(&data.parse_ctx).unwrap() {
