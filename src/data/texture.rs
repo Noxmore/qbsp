@@ -348,6 +348,13 @@ impl BspValue for BspMipTexture {
 
 		let header: BspTextureHeader = reader.read()?;
 
+		if header.width == 0 || header.height == 0 {
+			return Ok(Self {
+				header,
+				data: BspTextureData::default(),
+			});
+		}
+
 		macro_rules! read_data {
 			($offset:ident, $res:literal $(, $($res_operator:tt)+)?) => {{
 				if header.$offset == 0 {
