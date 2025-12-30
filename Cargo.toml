@@ -39,7 +39,9 @@ derive_more = { version = "2", features = [
 	"deref_mut",
 	"into_iterator",
 ] }
-bevy_reflect = { version = "0.18.0-rc", package = "bevy_reflect", features = [
+# The API is pretty stable, and I'd rather not get tied to Bevy's release cycle,
+# so we'll be very lenient on the version of bevy_reflect.
+bevy_reflect = { version = "0", package = "bevy_reflect", features = [
 	"glam",
 ], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
@@ -48,5 +50,5 @@ serde-big-array = { version = "0.5", optional = true }
 [features]
 default = ["meshing"]
 meshing = ["dep:texture_packer"]
-bevy_reflect = ["dep:bevy_reflect"]
+"bevy_reflect" = ["dep:bevy_reflect"]
 serde = ["dep:serde", "dep:serde-big-array", "smallvec/serde", "bitflags/serde"]
