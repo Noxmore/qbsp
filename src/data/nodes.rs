@@ -112,8 +112,8 @@ impl BspNodeRef<u32> {
 	/// of `1 - signed_node_ref`. `-1` (leaf 0) means out-of-bounds.
 	pub const fn from_i32(value: i32) -> Self {
 		if value.is_negative() {
-			// We add one to deal with integer asymmetry. Using +1 instead of -1 to avoid possible overflow.
-			Self::Leaf(-(value + 1) as u32)
+			// Bitwise not handles integer asymmetry and overflow.
+			Self::Leaf(!value as u32)
 		} else {
 			Self::Node(value as u32)
 		}
@@ -125,8 +125,8 @@ impl BspNodeRef<u16> {
 	/// of `1 - signed_node_ref`. `-1` (leaf 0) means out-of-bounds.
 	pub const fn from_i16(value: i16) -> Self {
 		if value.is_negative() {
-			// We add one to deal with integer asymmetry. Using +1 instead of -1 to avoid possible overflow.
-			Self::Leaf(-(value + 1) as u16)
+			// Bitwise not handles integer asymmetry and overflow.
+			Self::Leaf(!value as u16)
 		} else {
 			Self::Node(value as u16)
 		}
