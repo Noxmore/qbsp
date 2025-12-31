@@ -46,6 +46,69 @@ impl Rect<Vec2> {
 	}
 }
 
+/// Quake strings, like that used for the entity lump, aren't UTF-8. Instead, they're null-terminated ASCII with a second character set.
+///
+/// This is a convenience function that removes the extra data, converting it into valid UTF-8 in-place, then returns the resulting string.
+pub fn quake_string_to_utf8_lossy(quake_str: &mut Vec<u8>) -> &str {
+	for byte in quake_str.iter_mut() {
+		if *byte > 127 {
+			// Convert alternate glyph versions.
+			*byte -= 128;
+		}
+		/* if *byte == 0 {
+			// Truncate the null terminator. Probably doesn't need to run on every byte.
+			quake_str.truncate(i);
+			break;
+		} */
+	}
+
+	// Remove null terminator.
+	if quake_str.last().copied() == Some(0) {
+		quake_str.pop();
+	}
+
+	// SAFETY: All characters are in the range of 0..=127.
+	unsafe { str::from_utf8_unchecked(quake_str) }
+}
+
+/// Quake strings, like that used for the entity lump, aren't UTF-8. Instead, they're null-terminated ASCII with a second character set.
+///
+/// This function creates a new UTF-8 string that prefixes and suffixes the alternate character set.
+pub fn quake_string_to_utf8(quake_str: &[u8], alt_prefix: &str, alt_suffix: &str) -> String {
+	let mut s = String::with_capacity(quake_str.len());
+
+	let mut was_alt = false;
+	for mut byte in quake_str.iter().copied() {
+		let is_alt = byte > 127;
+
+		if is_alt && !was_alt {
+			s.push_str(alt_prefix);
+		} else if !is_alt && was_alt {
+			s.push_str(alt_suffix);
+		}
+
+		if is_alt {
+			byte -= 128;
+		}
+		// Handle null terminator.
+		if byte == 0 {
+			return s;
+		}
+
+		// SAFETY: If `char_number_range` passes, this will as well.
+		s.push(unsafe { char::from_u32_unchecked(byte as u32) });
+
+		was_alt = is_alt;
+	}
+
+	// Final suffix.
+	if was_alt {
+		s.push_str(alt_suffix);
+	}
+
+	s
+}
+
 /// Displays bytes in string form if they make up a string, else just displays them as bytes.
 pub(crate) fn display_magic_number(bytes: &[u8]) -> String {
 	std::str::from_utf8(bytes)
@@ -167,8 +230,8 @@ pub(crate) fn calculate_visdata_indices(vis_data: &[u8], num_leaves: usize) -> V
 }
 
 #[cfg(test)]
-mod test {
-	use crate::util::calculate_visdata_indices;
+mod tests {
+	use crate::util::{calculate_visdata_indices, quake_string_to_utf8};
 
 	const TEST_VISDATA: &[u8] = &[0b1010_0111, 0, 5, 0b0000_0001, 0b0001_0000, 0, 12, 0b1000_0000];
 
@@ -178,5 +241,22 @@ mod test {
 			calculate_visdata_indices(TEST_VISDATA, 256).collect::<Vec<_>>(),
 			&[1, 2, 3, 6, 8, 49, 61, 168]
 		);
+	}
+
+	// Sanity check, as quake_string_to_utf8 functions assume this.
+	#[test]
+	fn char_number_range() {
+		for i in 0..=127u8 {
+			assert!(char::from_u32(i as u32).is_some());
+		}
+	}
+
+	#[test]
+	fn quake_string_alt_text_surrounding() {
+		let quake_string = [b'h', b'i', b' ', b't' + 128, b'h' + 128, b'e', b'r' + 128, b'e' + 128];
+
+		let out = quake_string_to_utf8(&quake_string, "<b>", "</b>");
+
+		assert_eq!(out, "hi <b>th</b>e<b>re</b>");
 	}
 }

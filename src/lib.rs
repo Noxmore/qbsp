@@ -283,7 +283,8 @@ pub struct BspData {
 	/// Essentially an embedded .map file, the differences being:
 	/// - Brush data has been stripped.
 	/// - Brush entities have a `model` property indexing into the `models` field of this struct.
-	pub entities: String,
+	/// - Non UTF-8 text format. Use [`quake_string_to_utf8(...)`](util::quake_string_to_utf8) and [`quake_string_to_utf8_lossy(...)`](util::quake_string_to_utf8_lossy) to convert.
+	pub entities: Vec<u8>,
 	pub planes: Vec<BspPlane>,
 	pub textures: Vec<Option<BspMipTexture>>,
 	/// All vertex positions.
@@ -345,25 +346,10 @@ impl BspData {
 
 		let lump_dir: LumpDirectory = reader.read()?;
 
-		let mut entities_bytes = lump_dir.entities.get(bsp)?.to_vec();
-		for (i, byte) in entities_bytes.iter_mut().enumerate() {
-			if *byte > 127 {
-				// For some reason some characters in the entities lump are offset to the second half of byte values, no idea why.
-				*byte -= 128;
-			} else if *byte == 0 {
-				// Also, sometimes the entity lump ends early, so this just truncates it if that is the case.
-				entities_bytes.truncate(i);
-				break;
-			}
-		}
-
 		let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
 
 		let data = Self {
-			entities: std::str::from_utf8(&entities_bytes)
-				.map_err(BspParseError::map_utf8_error(&entities_bytes))
-				.job("Reading entities lump")?
-				.to_string(),
+			entities: lump_dir.entities.get(bsp)?.to_vec(),
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
 			textures: if let Some(tex_lump) = *lump_dir.textures {
 				read_mip_texture_lump(&mut BspByteReader::new(tex_lump.get(bsp)?, &ctx)).job("Reading texture lump")?

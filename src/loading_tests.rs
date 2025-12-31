@@ -3,6 +3,7 @@
 use crate::{
 	data::{lighting::BspLighting, nodes::BspNodeRef},
 	prelude::*,
+	util::{quake_string_to_utf8, quake_string_to_utf8_lossy},
 	BspFormat,
 };
 
@@ -251,5 +252,23 @@ fn validate_bounds() {
 		for leaf_brush in data.leaf_brushes.iter().copied() {
 			assert!(leaf_brush.0 < data.brushes.len().max(1) as u32);
 		}
+	}
+}
+
+#[test]
+fn entity_lump_loading() {
+	for TestingBsp { name, bsp, lit: _ } in all_bsps() {
+		println!("{name}");
+		let mut data = match BspData::parse(BspParseInput {
+			bsp,
+			lit: None,
+			settings: BspParseSettings::default(),
+		}) {
+			Ok(data) => data,
+			Err(err) => panic!("Error loading {name}: {err}"),
+		};
+
+		quake_util::qmap::parse(&mut std::io::Cursor::new(quake_string_to_utf8(&data.entities, "\\b", "\\b"))).unwrap();
+		quake_util::qmap::parse(&mut std::io::Cursor::new(quake_string_to_utf8_lossy(&mut data.entities))).unwrap();
 	}
 }

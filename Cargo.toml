@@ -47,6 +47,9 @@ bevy_reflect = { version = "0", package = "bevy_reflect", features = [
 serde = { version = "1", features = ["derive"], optional = true }
 serde-big-array = { version = "0.5", optional = true }
 
+[dev-dependencies]
+quake-util = { version = "0.4", features = ["std"] }
+
 [features]
 default = ["meshing"]
 meshing = ["dep:texture_packer"]
