@@ -55,11 +55,6 @@ pub fn quake_string_to_utf8_lossy(quake_str: &mut Vec<u8>) -> &str {
 			// Convert alternate glyph versions.
 			*byte -= 128;
 		}
-		/* if *byte == 0 {
-			// Truncate the null terminator. Probably doesn't need to run on every byte.
-			quake_str.truncate(i);
-			break;
-		} */
 	}
 
 	// Remove null terminator.
