@@ -27,12 +27,12 @@ license.workspace = true
 [dependencies]
 qbsp_macros = { version = "0.13.0", path = "qbsp_macros" }
 
-bitflags = "2.10"
+bitflags = "2"
 glam = "0.30" # See mini-rant below.
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 texture_packer = { version = "0.30", optional = true }
-thiserror = "2.0"
+thiserror = "2"
 derive_more = { version = "2", features = [
 	"deref",
 	"deref_mut",
