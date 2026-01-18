@@ -28,3 +28,10 @@ let _ = BspData::parse(BspParseInput {
 I might work on these at a later date, but if anyone wants to help out or just give some ideas, they're more than welcome to!
 - More flexible meshing API
 - BSP writing
+
+# Version support table
+I wish these used whatever was in your project, but at the time of writing, wildcards just makes Cargo just choose the latest version rather what what is best for you.
+
+| QBSP | bevy_reflect | glam |
+|------|--------------|------|
+| 0.13 | 0.18         | 0.30 |
