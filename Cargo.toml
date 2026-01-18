@@ -2,7 +2,7 @@
 members = ["qbsp_macros", "tools/*"]
 
 [workspace.package]
-version = "0.12.1"
+version = "0.13.0"
 description = "Rust crate for parsing and operating with Quake 1, 2, and GoldSrc BSP files"
 edition = "2021"
 authors = ["Noxmore"]
@@ -25,10 +25,10 @@ license.workspace = true
 
 
 [dependencies]
-qbsp_macros = { version = "0.12.1", path = "qbsp_macros" }
+qbsp_macros = { version = "0.13.0", path = "qbsp_macros" }
 
 bitflags = "2.10"
-glam = "0.*"
+glam = "0.30" # See mini-rant below.
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 strum = { version = "0.27", features = ["derive"] }
@@ -39,9 +39,10 @@ derive_more = { version = "2", features = [
 	"deref_mut",
 	"into_iterator",
 ] }
-# The API is pretty stable, and I'd rather not get tied to Bevy's release cycle,
-# so we'll be very lenient on the version of bevy_reflect.
-bevy_reflect = { version = "0.*", package = "bevy_reflect", features = [
+# The API is pretty stable, and I'd rather not get tied to Bevy's release cycle.
+# Unfortunately, Cargo doesn't seem to know how to resolve a wildcard to anything other than
+# the latest version in this situation, so the version has to be more precise than 0.*.
+bevy_reflect = { version = "0.18", package = "bevy_reflect", features = [
 	"glam",
 ], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
