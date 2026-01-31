@@ -181,6 +181,18 @@ impl BspFormat {
 			Self::BSP38 | Self::BSP38Qbism => None,
 		}
 	}
+
+	pub const fn is_quake1(self) -> bool {
+		matches!(self, Self::BSP29 | Self::BSP2)
+	}
+
+	pub const fn is_goldsrc(self) -> bool {
+		matches!(self, Self::BSP30)
+	}
+
+	pub const fn is_quake2(self) -> bool {
+		matches!(self, Self::BSP38 | Self::BSP38Qbism)
+	}
 }
 
 impl BspValue for BspFormat {

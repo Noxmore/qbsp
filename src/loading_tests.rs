@@ -4,7 +4,6 @@ use crate::{
 	data::{lighting::BspLighting, nodes::BspNodeRef},
 	prelude::*,
 	util::{quake_string_to_utf8, quake_string_to_utf8_lossy},
-	BspFormat,
 };
 
 #[derive(Clone, Copy)]
@@ -133,6 +132,7 @@ fn prase_bspx_lumps() {
 		}
 
 		// RGB lighting is already handled by `use_bspx_rgb_lighting`
+		// FACENORMALS is already handled by `validate_bounds`
 	}
 }
 
@@ -248,9 +248,23 @@ fn validate_bounds() {
 			assert!(brush_side.tex_info_idx.0 < data.tex_info.len().max(1) as u32);
 		}
 
-		assert_eq!(!data.leaf_brushes.is_empty(), data.parse_ctx.format == BspFormat::BSP38);
+		assert_eq!(!data.leaf_brushes.is_empty(), data.parse_ctx.format.is_quake2());
 		for leaf_brush in data.leaf_brushes.iter().copied() {
 			assert!(leaf_brush.0 < data.brushes.len().max(1) as u32);
+		}
+
+		if let Some(face_normals) = data.bspx.parse_face_normals(&data.parse_ctx, &data.faces) {
+			let face_normals = face_normals.unwrap();
+
+			assert_eq!(face_normals.faces.len(), data.faces.len());
+			for face in &face_normals.faces {
+				validate_range(face.vertex_start, face.vertex_count, face_normals.face_vertices.len());
+			}
+			for vertex in &face_normals.face_vertices {
+				assert!(vertex.normal_idx < face_normals.unique_vecs.len().max(1) as u32);
+				assert!(vertex.tangent_idx < face_normals.unique_vecs.len().max(1) as u32);
+				assert!(vertex.bi_tangent_idx < face_normals.unique_vecs.len().max(1) as u32);
+			}
 		}
 	}
 }

@@ -17,7 +17,7 @@ use crate::{
 		nodes::{FloatBoundingBox, ShortBsp29LeafContents},
 		texture::PlanarTextureProjection,
 		util::{BspVariableArray, FixedStr},
-		LightmapOffset,
+		BspFace, LightmapOffset,
 	},
 	reader::{BspByteReader, BspParseContext, BspValue},
 	BspParseError, BspParseResultDoingJobExt, BspResult, LumpEntry,
@@ -128,6 +128,7 @@ impl BspxData {
 	}
 
 	/// Parses the `DECOUPLED_LM` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	/// See [`DecoupledLightmaps`] documentation for more info on the lump.
 	pub fn parse_decoupled_lm(&self, ctx: &BspParseContext) -> Option<BspResult<DecoupledLightmaps>> {
 		let lump_data = self.get("DECOUPLED_LM")?;
 		let mut reader = BspByteReader::new(lump_data, ctx);
@@ -144,6 +145,16 @@ impl BspxData {
 		}
 
 		Some(Ok(lm_infos))
+	}
+
+	/// Parses the `FACENORMALS` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
+	///
+	/// The `faces` parameter should be provided with [`BspData::faces`](qbsp::BspData::faces).
+	///
+	/// See [`FaceNormals`] documentation for more info on the lump.
+	pub fn parse_face_normals(&self, ctx: &BspParseContext, faces: &[BspFace]) -> Option<BspResult<FaceNormals>> {
+		let mut reader = BspByteReader::new(self.get("FACENORMALS")?, ctx);
+		Some(FaceNormals::parse(&mut reader, faces).job("Parsing FACENORMALS BSPX lump"))
 	}
 }
 
@@ -335,4 +346,66 @@ pub struct DecoupledLightmap {
 	pub offset: LightmapOffset,
 
 	pub projection: PlanarTextureProjection,
+}
+
+/// Stores per-face-corner normals, tangents, and bi-tangents.
+///
+/// Per-ericw-tools documentation:
+/// "For maps using `_phong`, this allows in-engine dynamic lights to render with the same smooth/sharp edges that the baked lighting uses."
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FaceNormals {
+	/// Many, if not most brush faces are cardinally aligned. Because of this, the `FACENORMALS` lump only stores unique vectors.
+	/// Face vertices store indexes into this, cutting the size of each from 36 bytes to 12.
+	pub unique_vecs: Vec<Vec3>,
+	/// The normal indexes of every face corner stored in a continuous buffer that `faces` indexes into.
+	pub face_vertices: Vec<FaceNormalVertex>,
+	/// Corresponds to the [`BspData::faces`](qbsp::BspData::faces) vector, each one indexing into `face_vertices`.
+	pub faces: Vec<FaceNormalFace>,
+}
+impl FaceNormals {
+	/// Parses [`FaceNormals`] from a BSP file. The `faces` parameter should be provided with [`BspData::faces`](qbsp::BspData::faces).
+	pub fn parse(reader: &mut BspByteReader, faces: &[BspFace]) -> BspResult<Self> {
+		let unique_vecs = reader.read::<BspVariableArray<Vec3, u32>>()?.inner;
+
+		let mut face_vertices: Vec<FaceNormalVertex> = Vec::with_capacity(faces.iter().map(|face| face.num_edges.0 as usize).sum::<usize>());
+		let mut face_mappings: Vec<FaceNormalFace> = Vec::with_capacity(faces.len());
+
+		for face in faces {
+			face_mappings.push(FaceNormalFace {
+				vertex_start: face_vertices.len() as u32,
+				vertex_count: face.num_edges.0,
+			});
+
+			for _ in 0..face.num_edges.0 {
+				face_vertices.push(reader.read()?);
+			}
+		}
+
+		Ok(Self {
+			unique_vecs,
+			face_vertices,
+			faces: face_mappings,
+		})
+	}
+}
+
+/// Contains a range to index into [`FaceNormals::face_vertices`].
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FaceNormalFace {
+	pub vertex_start: u32,
+	pub vertex_count: u32,
+}
+
+/// Indexes into [`FaceNormals::unique_vecs`].
+#[derive(BspValue, Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct FaceNormalVertex {
+	pub normal_idx: u32,
+	pub tangent_idx: u32,
+	pub bi_tangent_idx: u32,
 }
