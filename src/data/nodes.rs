@@ -1,8 +1,8 @@
 //! Data definitions for the BSP node tree.
 
 use crate::{
-	data::{util::UBspValue, visdata::VisDataRef},
 	BspParseError,
+	data::{util::UBspValue, visdata::VisDataRef},
 };
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 use bitflags::bitflags;
 
 use crate::{
+	BspResult,
 	data::util::NoField,
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspResult,
 };
 
 /// A reference to a [`BspNode`].

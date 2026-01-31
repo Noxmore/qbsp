@@ -12,15 +12,15 @@ use smallvec::SmallVec;
 use qbsp_macros::BspValue;
 
 use crate::{
+	BspData, BspParseError, BspParseResultDoingJobExt, BspResult, LumpEntry,
 	data::{
-		lighting::{BspLighting, LightmapStyle},
+		BspFace, LightmapOffset,
+		lighting::{LightmapStyle, RgbLighting, read_lit},
 		nodes::{FloatBoundingBox, ShortBsp29LeafContents},
 		texture::PlanarTextureProjection,
 		util::{BspVariableArray, FixedStr},
-		BspFace, LightmapOffset,
 	},
 	reader::{BspByteReader, BspParseContext, BspValue},
-	BspParseError, BspParseResultDoingJobExt, BspResult, LumpEntry,
 };
 
 pub const BSPX_ENTRY_NAME_LEN: usize = 24;
@@ -30,14 +30,14 @@ pub const BSPX_ENTRY_NAME_LEN: usize = 24;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxLumpEntry {
 	pub name: FixedStr<BSPX_ENTRY_NAME_LEN>,
-	pub entry: LumpEntry,
+	pub lump: LumpEntry,
 }
 
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxDirectory {
-	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, LumpEntry>,
+	pub entries: Vec<BspxLumpEntry>,
 }
 impl BspValue for BspxDirectory {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
@@ -58,103 +58,97 @@ impl BspValue for BspxDirectory {
 
 		let num_lumps: u32 = reader.read().job("lump count")?;
 
-		let mut inner = HashMap::new();
+		let mut entries = Vec::with_capacity(num_lumps as usize);
 
 		for i in 0..num_lumps {
 			let entry: BspxLumpEntry = reader.read().job(|| format!("lump entry {i}/{num_lumps}"))?;
-
-			inner.insert(entry.name, entry.entry);
+			entries.push(entry);
 		}
 
-		Ok(Self { inner })
+		Ok(Self { entries })
 	}
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 		unimplemented!("BspxDirectory is of variable size")
 	}
 }
 
-/// Owned version of [`BspxDirectory`]. Convert via [`BspxData::new`].
+/// BSPX is a community addition to the BSP format.
+/// This struct contains built-in reading and support for commonly used ones.
+/// Any lumps it doesn't know how to parse is stored in [`BspxData::unparsed`].
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxData {
-	pub inner: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Vec<u8>>,
+	pub rgb_lighting: Option<RgbLighting>,
+	pub light_grid_octree: Option<LightGridOctree>,
+	pub brush_list: Option<BrushList>,
+	pub decoupled_lm: Option<DecoupledLightmaps>,
+	pub face_normals: Option<FaceNormals>,
+
+	pub unparsed: HashMap<FixedStr<BSPX_ENTRY_NAME_LEN>, Vec<u8>>,
 }
 impl BspxData {
-	pub fn new(bsp: &[u8], dir: &BspxDirectory) -> BspResult<Self> {
+	pub fn parse(bsp: &[u8], dir: &BspxDirectory, bsp_data: &BspData) -> BspResult<Self> {
 		let mut data = Self::default();
 
-		for (name, entry) in &dir.inner {
-			data.inner.insert(*name, entry.get(bsp)?.into());
+		for entry in &dir.entries {
+			macro_rules! check_duplicate {
+				($lump:ident) => {
+					if data.$lump.is_some() {
+						return Err(BspParseError::DuplicateBspxLump(entry.name.to_string()));
+					}
+				};
+			}
+
+			let lump = entry.lump.get(bsp)?;
+
+			match entry.name.as_str() {
+				// Builtin lumps.
+				"RGBLIGHTING" => {
+					check_duplicate!(rgb_lighting);
+					data.rgb_lighting = Some(read_lit(lump, &bsp_data.parse_ctx, true).job("Parsing RGBLIGHTING BSPX lump")?);
+				}
+				"LIGHTGRID_OCTREE" => {
+					check_duplicate!(light_grid_octree);
+					data.light_grid_octree = Some(BspByteReader::new(lump, &bsp_data.parse_ctx).read()?);
+				}
+				"BRUSHLIST" => {
+					check_duplicate!(brush_list);
+					data.brush_list = Some(parse_brush_list(BspByteReader::new(lump, &bsp_data.parse_ctx))?);
+				}
+				"DECOUPLED_LM" => {
+					check_duplicate!(decoupled_lm);
+					data.decoupled_lm = Some(parse_decoupled_lm(BspByteReader::new(lump, &bsp_data.parse_ctx))?);
+				}
+				"FACENORMALS" => {
+					check_duplicate!(face_normals);
+					data.face_normals = Some(FaceNormals::parse(BspByteReader::new(lump, &bsp_data.parse_ctx), &bsp_data.faces)?);
+				}
+
+				// Lumps we don't know how to parse.
+				_ => {
+					data.unparsed.insert(entry.name, lump.to_vec());
+				}
+			}
 		}
 
 		Ok(data)
 	}
 
-	/// Retrieves a lump entry from the directory, returns `None` if the entry does not exist.
+	/// Retrieves an unparsed lump entry from the unparsed data, returns `None` if the entry does not exist.
 	#[inline]
-	pub fn get(&self, s: &str) -> Option<&[u8]> {
-		self.inner.get(&FixedStr::from_str(s).ok()?).map(|v| &**v)
+	pub fn get_unparsed(&self, s: &str) -> Option<&[u8]> {
+		self.unparsed.get(&FixedStr::from_str(s).ok()?).map(|v| &**v)
 	}
 
-	/// Parses the `RGBLIGHTING` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-	pub fn parse_rgb_lighting(&self, ctx: &BspParseContext) -> Option<BspResult<BspLighting>> {
-		Some(BspLighting::read_lit(self.get("RGBLIGHTING")?, ctx, true).job("Parsing RGBLIGHTING BSPX lump"))
-	}
-
-	/// Parses the `LIGHTGRID_OCTREE` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-	pub fn parse_light_grid_octree(&self, ctx: &BspParseContext) -> Option<BspResult<LightGridOctree>> {
-		let mut reader = BspByteReader::new(self.get("LIGHTGRID_OCTREE")?, ctx);
-		Some(reader.read().job("Parsing LIGHTGRID_OCTREE BSPX lump"))
-	}
-
-	/// Parses the `BRUSHLIST` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-	pub fn parse_brush_list(&self, ctx: &BspParseContext) -> Option<BspResult<BrushList>> {
-		let mut reader = BspByteReader::new(self.get("BRUSHLIST")?, ctx);
-		let mut brush_list = BrushList::new();
-
-		let mut i: usize = 0;
-		while reader.in_bounds() {
-			let brushes = match reader.read().job(|| format!("Parsing BRUSHLIST BSPX lump element {i}")) {
-				Ok(v) => v,
-				Err(err) => return Some(Err(err)),
-			};
-
-			brush_list.push(brushes);
-			i += 1;
-		}
-
-		Some(Ok(brush_list))
-	}
-
-	/// Parses the `DECOUPLED_LM` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-	/// See [`DecoupledLightmaps`] documentation for more info on the lump.
-	pub fn parse_decoupled_lm(&self, ctx: &BspParseContext) -> Option<BspResult<DecoupledLightmaps>> {
-		let lump_data = self.get("DECOUPLED_LM")?;
-		let mut reader = BspByteReader::new(lump_data, ctx);
-		let entries_count = lump_data.len() / DecoupledLightmap::bsp_struct_size(ctx);
-		let mut lm_infos = DecoupledLightmaps::with_capacity(entries_count);
-
-		for i in 0..entries_count {
-			let lm_info = match reader.read().job(|| format!("Parsing DECOUPLED_LM BSPX lump element {i}")) {
-				Ok(v) => v,
-				Err(err) => return Some(Err(err)),
-			};
-
-			lm_infos.push(lm_info);
-		}
-
-		Some(Ok(lm_infos))
-	}
-
-	/// Parses the `FACENORMALS` lump. Returns `None` if the lump does not exist, else returns `Some` with the parse result.
-	///
-	/// The `faces` parameter should be provided with [`BspData::faces`](qbsp::BspData::faces).
-	///
-	/// See [`FaceNormals`] documentation for more info on the lump.
-	pub fn parse_face_normals(&self, ctx: &BspParseContext, faces: &[BspFace]) -> Option<BspResult<FaceNormals>> {
-		let mut reader = BspByteReader::new(self.get("FACENORMALS")?, ctx);
-		Some(FaceNormals::parse(&mut reader, faces).job("Parsing FACENORMALS BSPX lump"))
+	/// Returns whether no BSPX data is stored.
+	pub fn is_empty(&self) -> bool {
+		self.rgb_lighting.is_none()
+			&& self.light_grid_octree.is_none()
+			&& self.brush_list.is_none()
+			&& self.decoupled_lm.is_none()
+			&& self.face_normals.is_none()
+			&& self.unparsed.is_empty()
 	}
 }
 
@@ -302,8 +296,25 @@ impl TryFrom<ModelBrushesIdx> for usize {
 	}
 }
 
-/// The output of reading the `BRUSHLIST` BSPX lump.
+/// Stores the brushes used to create the map, which non-Quake-2 BSPs don't. This can be useful mainly for collision.
 pub type BrushList = Vec<ModelBrushes>;
+
+/// Parses the `BRUSHLIST` lump. See [`BrushList`] documentation for more info on it.
+///
+/// This is a loose function because [`BrushList`] is a type alias.
+pub fn parse_brush_list(mut reader: BspByteReader) -> BspResult<BrushList> {
+	let mut brush_list = BrushList::new();
+
+	let mut i: usize = 0;
+	while reader.in_bounds() {
+		let brushes = reader.read().job(|| format!("Parsing BRUSHLIST BSPX lump element {i}"))?;
+
+		brush_list.push(brushes);
+		i += 1;
+	}
+
+	Ok(brush_list)
+}
 
 /// Per-model brush information stored in the `BRUSHLIST` BSPX lump.
 #[derive(BspValue, Debug, Clone)]
@@ -337,6 +348,26 @@ pub struct ModelBrushPlane {
 /// For the `DECOUPLED_LM` BSPX lump. Stores lightmap sizes and axes separately to textures. This vector is per-surface.
 pub type DecoupledLightmaps = Vec<DecoupledLightmap>;
 
+/// Parses the `DECOUPLED_LM` lump. See [`DecoupledLightmaps`] documentation for more info on it.
+///
+/// This is a loose function because [`DecoupledLightmaps`] is a type alias.
+pub fn parse_decoupled_lm(mut reader: BspByteReader) -> BspResult<DecoupledLightmaps> {
+	let entries_count = reader.len() / DecoupledLightmap::bsp_struct_size(reader.ctx);
+	let mut lm_infos = DecoupledLightmaps::with_capacity(entries_count);
+
+	for i in 0..entries_count {
+		let mut lm_info: DecoupledLightmap = reader.read().job(|| format!("Parsing DECOUPLED_LM BSPX lump element {i}"))?;
+
+		// This is done in FTE quake's source code, each with a comment saying "sigh" after, not sure why.
+		lm_info.projection.u_offset += 0.5;
+		lm_info.projection.v_offset += 0.5;
+
+		lm_infos.push(lm_info);
+	}
+
+	Ok(lm_infos)
+}
+
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -366,7 +397,7 @@ pub struct FaceNormals {
 }
 impl FaceNormals {
 	/// Parses [`FaceNormals`] from a BSP file. The `faces` parameter should be provided with [`BspData::faces`](qbsp::BspData::faces).
-	pub fn parse(reader: &mut BspByteReader, faces: &[BspFace]) -> BspResult<Self> {
+	pub fn parse(mut reader: BspByteReader, faces: &[BspFace]) -> BspResult<Self> {
 		let unique_vecs = reader.read::<BspVariableArray<Vec3, u32>>()?.inner;
 
 		let mut face_vertices: Vec<FaceNormalVertex> = Vec::with_capacity(faces.iter().map(|face| face.num_edges.0 as usize).sum::<usize>());

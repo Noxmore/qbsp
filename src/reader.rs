@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use std::mem;
 
-use crate::{prelude::*, BspFormat, BspParseError};
+use crate::{BspFormat, BspParseError, prelude::*};
 
 use glam::{IVec3, U16Vec2, U16Vec3, UVec3, Vec3};
 

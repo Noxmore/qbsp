@@ -3,15 +3,15 @@
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
 use bitflags::bitflags;
-use glam::{dvec2, Vec2, Vec3};
+use glam::{Vec2, Vec3, dvec2};
 use qbsp_macros::{BspValue, BspVariableValue};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
+	BspData, BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 	data::util::{FixedStr, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspData, BspParseError, BspParseResultDoingJobExt, BspResult, QUAKE_PALETTE,
 };
 
 /// Stack-allocated string the longest a texture name can be.

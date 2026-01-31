@@ -1,13 +1,13 @@
 //! Data definitions related to model and mesh data.
 
 use crate::{
+	BspData,
 	data::{
 		lighting::{LightmapOffset, LightmapStyle},
 		nodes::{BspNodeRef, FloatBoundingBox},
 		util::{NoField, UBspValue},
 	},
 	reader::BspVariableValue,
-	BspData,
 };
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;

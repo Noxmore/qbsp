@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 
-use glam::{uvec2, UVec2, Vec2};
+use glam::{UVec2, Vec2, uvec2};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use thiserror::Error;
 
 mod packer;
@@ -13,9 +13,9 @@ mod packer;
 pub use packer::{DefaultLightmapPacker, LightmapPacker, LightmapPackerFaceView, PerSlotLightmapPacker, PerStyleLightmapPacker};
 
 use crate::{
+	BspData,
 	data::{lighting::LightmapStyle, texture::BspTexFlags},
 	mesh::FaceExtents,
-	BspData, BspParseError,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -57,8 +57,6 @@ pub enum ComputeLightmapAtlasError {
 	},
 	#[error("No lightmaps")]
 	NoLightmaps,
-	#[error("DECOUPLED_LM BSPX lump is present, but failed to parse: {0}")]
-	InvalidDecoupledLM(BspParseError),
 }
 
 struct ReservedLightmapPixel {
@@ -96,18 +94,6 @@ impl BspData {
 	/// Packs every face's lightmap together onto a single atlas for GPU rendering.
 	pub fn compute_lightmap_atlas<P: LightmapPacker>(&self, mut packer: P) -> Result<LightmapAtlasOutput<P>, ComputeLightmapAtlasError> {
 		let Some(lighting) = &self.lighting else { return Err(ComputeLightmapAtlasError::NoLightmaps) };
-		let mut decoupled_lm = match self.bspx.parse_decoupled_lm(&self.parse_ctx) {
-			Some(x) => Some(x.map_err(ComputeLightmapAtlasError::InvalidDecoupledLM)?),
-			None => None,
-		};
-
-		// This is done in FTE quake's source code, each with a comment saying "sigh" after, not sure why.
-		if let Some(lm_infos) = &mut decoupled_lm {
-			for lm_info in lm_infos {
-				lm_info.projection.u_offset += 0.5;
-				lm_info.projection.v_offset += 0.5;
-			}
-		}
 
 		let settings = packer.settings();
 
@@ -119,7 +105,7 @@ impl BspData {
 		for (face_idx, face) in self.faces.iter().enumerate() {
 			let tex_info = &self.tex_info[face.texture_info_idx.0 as usize];
 
-			let decoupled_lightmap = decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
+			let decoupled_lightmap = self.bspx.decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
 
 			let lm_info = match &decoupled_lightmap {
 				Some(lm_info) => {

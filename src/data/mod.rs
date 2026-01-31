@@ -6,8 +6,11 @@ use qbsp_macros::{BspValue, BspVariableValue};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::reader::{BspByteReader, BspParseContext, BspValue};
-use crate::{data::util::NoField, BspParseError, BspParseResultDoingJobExt, BspResult};
+use crate::{BspParseError, BspParseResultDoingJobExt, BspResult, data::util::NoField};
+use crate::{
+	bspx::BspxDirectory,
+	reader::{BspByteReader, BspParseContext, BspValue},
+};
 
 pub mod brush;
 pub mod bspx;
@@ -41,11 +44,7 @@ impl LumpEntry {
 	/// Returns the slice of `data` (BSP file input) that this entry points to.
 	pub fn get<'a>(&self, data: &'a [u8]) -> BspResult<&'a [u8]> {
 		let (from, to) = (self.offset as usize, self.offset as usize + self.len as usize);
-		if to > data.len() {
-			Err(BspParseError::LumpOutOfBounds(*self))
-		} else {
-			Ok(&data[from..to])
-		}
+		if to > data.len() { Err(BspParseError::LumpOutOfBounds(*self)) } else { Ok(&data[from..to]) }
 	}
 
 	/// If `true`, this lump contains no data.
@@ -120,7 +119,7 @@ pub struct LumpDirectory {
 	pub areas: Bsp38OnlyLumpEntry,
 	pub area_portals: Bsp38OnlyLumpEntry,
 
-	pub bspx: bspx::BspxDirectory,
+	pub bspx: Option<BspxDirectory>,
 }
 impl LumpDirectory {
 	/// Does not include `bspx`, as this method is used to calculate the offset
@@ -179,7 +178,7 @@ impl BspValue for LumpDirectory {
 			areas: reader.read().job("Reading areas entry")?,
 			area_portals: reader.read().job("Reading area_portals entry")?,
 
-			bspx: bspx::BspxDirectory::default(),
+			bspx: None,
 		};
 
 		let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
@@ -188,8 +187,8 @@ impl BspValue for LumpDirectory {
 			bspx_offset += 3;
 		} */
 
-		match reader.with_pos(bspx_offset as usize).read() {
-			Ok(bspx_dir) => dir.bspx = bspx_dir,
+		match reader.with_pos(bspx_offset as usize).read::<BspxDirectory>() {
+			Ok(bspx_dir) => dir.bspx = Some(bspx_dir),
 			Err(BspParseError::NoBspxDirectory) => {}
 			Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
 		}

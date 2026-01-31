@@ -2,18 +2,18 @@
 
 use std::collections::HashMap;
 
-use glam::{vec2, IVec2, UVec2, Vec2, Vec3};
+use glam::{IVec2, UVec2, Vec2, Vec3, vec2};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{
+	BspData,
 	data::{
 		bspx::DecoupledLightmap,
 		models::BspFace,
 		texture::{BspTexFlags, TextureName},
 	},
 	util::Rect,
-	BspData,
 };
 
 pub mod lightmap;
@@ -114,11 +114,11 @@ impl BspData {
 				}
 
 				// Insert lightmap uvs
-				if let Some(uv_map) = lightmap_uvs {
-					if let Some(uvs) = uv_map.get(&face_idx) {
-						assert_eq!(uvs.len(), face.num_edges.0 as usize);
-						mesh.lightmap_uvs.get_or_insert_with(Vec::new).extend(uvs);
-					}
+				if let Some(uv_map) = lightmap_uvs
+					&& let Some(uvs) = uv_map.get(&face_idx)
+				{
+					assert_eq!(uvs.len(), face.num_edges.0 as usize);
+					mesh.lightmap_uvs.get_or_insert_with(Vec::new).extend(uvs);
 				}
 			}
 

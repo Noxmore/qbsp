@@ -3,12 +3,12 @@
 use glam::Vec3;
 
 use crate::{
+	BspData,
 	data::{
 		nodes::{BspLeafContentFlags, BspNodeRef},
 		visdata::VisDataRef,
 	},
 	util::{self, VisdataIter},
-	BspData,
 };
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -45,20 +45,12 @@ pub enum VisResult<'a> {
 impl<'a> VisResult<'a> {
 	/// If this is [`VisResult::Clusters`], return the inner iterator. Otherwise, return `Err(self)`.
 	pub fn into_clusters(self) -> Result<VisdataIter<'a>, Self> {
-		if let Self::Clusters(clusters) = self {
-			Ok(clusters)
-		} else {
-			Err(self)
-		}
+		if let Self::Clusters(clusters) = self { Ok(clusters) } else { Err(self) }
 	}
 
 	/// If this is [`VisResult::LeafIndices`], return the inner iterator. Otherwise, return `Err(self)`.
 	pub fn into_leaf_indices(self) -> Result<VisdataIter<'a>, Self> {
-		if let Self::LeafIndices(leaf_indices) = self {
-			Ok(leaf_indices)
-		} else {
-			Err(self)
-		}
+		if let Self::LeafIndices(leaf_indices) = self { Ok(leaf_indices) } else { Err(self) }
 	}
 }
 

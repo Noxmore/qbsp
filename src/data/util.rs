@@ -6,11 +6,11 @@ use std::{marker::PhantomData, str::FromStr};
 use bevy_reflect::Reflect;
 use qbsp_macros::BspVariableValue;
 #[cfg(feature = "serde")]
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::{
-	reader::{BspByteReader, BspParseContext, BspValue},
 	BspParseError, BspParseResultDoingJobExt, BspResult,
+	reader::{BspByteReader, BspParseContext, BspValue},
 };
 
 /// [`BspValue`] implementor that always returns `Ok(NoField)`, and has 0 size, effectively a NO-OP.
@@ -34,12 +34,12 @@ impl BspValue for NoField {
 /// Internal module to prevent the required imports from polluting the `util` module.
 mod no_field_impls {
 	use crate::{
+		LumpEntry,
 		data::{
 			models::PerSizeHulls,
 			nodes::{BspAmbience, BspLeafBrushes},
 			texture::{BspTexQ2Info, Palette},
 		},
-		LumpEntry,
 	};
 
 	use super::NoField;

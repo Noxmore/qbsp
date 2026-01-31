@@ -7,9 +7,9 @@ use qbsp_macros::{BspValue, BspVariableValue};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+	BspResult,
 	data::util::{BspVariableArray, IBspValue, NoField},
 	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
-	BspResult,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -7,25 +7,26 @@ use qbsp_macros::BspValue;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
 	BspFormat, BspParseError, BspResult,
+	reader::{BspByteReader, BspParseContext, BspValue, BspVariableValue},
 };
+
+pub type GrayscaleLighting = Vec<u8>;
+pub type RgbLighting = Vec<[u8; 3]>;
 
 /// Lighting data stored in a BSP file or a neighboring LIT file.
 #[derive(Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum BspLighting {
-	/// Greyscale lighting.
-	White(Vec<u8>),
-	/// RGB color lighting.
-	Colored(Vec<[u8; 3]>),
+	Grayscale(GrayscaleLighting),
+	Colored(RgbLighting),
 }
 
 impl BspValue for BspLighting {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		match reader.ctx.format {
-			BspFormat::BSP2 | BspFormat::BSP29 => Ok(Self::White(reader.read_rest().to_vec())),
+			BspFormat::BSP2 | BspFormat::BSP29 => Ok(Self::Grayscale(reader.read_rest().to_vec())),
 			BspFormat::BSP30 | BspFormat::BSP38 | BspFormat::BSP38Qbism => {
 				let total_len = reader.len();
 				let (rgb_pixels, rest) = reader.read_bytes(total_len)?.as_chunks::<3>();
@@ -44,34 +45,11 @@ impl BspValue for BspLighting {
 }
 
 impl BspLighting {
-	/// Parses colored lighting from a LIT file.
-	pub fn read_lit(data: &[u8], ctx: &BspParseContext, ignore_header: bool) -> BspResult<Self> {
-		let mut reader = BspByteReader::new(data, ctx);
-
-		if !ignore_header {
-			let magic: [u8; 4] = reader.read()?;
-			if &magic != b"QLIT" {
-				return Err(BspParseError::WrongMagicNumber {
-					found: magic,
-					expected: "QLIT",
-				});
-			}
-
-			let _version: i32 = reader.read()?;
-		}
-
-		if !reader.len().is_multiple_of(3) {
-			return Err(BspParseError::ColorDataSizeNotDevisableBy3(reader.len()));
-		}
-
-		Ok(Self::Colored(reader.read_rest().chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect()))
-	}
-
 	/// Convince function to get a location as an RGB color.
 	#[inline]
 	pub fn get(&self, i: usize) -> Option<[u8; 3]> {
 		match self {
-			Self::White(v) => {
+			Self::Grayscale(v) => {
 				let v = *v.get(i)?;
 				Some([v, v, v])
 			}
@@ -83,7 +61,7 @@ impl BspLighting {
 	#[inline]
 	pub fn len(&self) -> usize {
 		match self {
-			Self::White(vec) => vec.len(),
+			Self::Grayscale(vec) => vec.len(),
 			Self::Colored(vec) => vec.len(),
 		}
 	}
@@ -92,7 +70,7 @@ impl BspLighting {
 	#[inline]
 	pub fn bytes(&self) -> usize {
 		match self {
-			Self::White(vec) => vec.len(),
+			Self::Grayscale(vec) => vec.len(),
 			Self::Colored(vec) => vec.len() * 3,
 		}
 	}
@@ -106,10 +84,33 @@ impl BspLighting {
 impl std::fmt::Debug for BspLighting {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::White(vec) => write!(f, "White(...) (len: {})", vec.len()),
+			Self::Grayscale(vec) => write!(f, "White(...) (len: {})", vec.len()),
 			Self::Colored(vec) => write!(f, "Colored(...) (len: {})", vec.len()),
 		}
 	}
+}
+
+/// Parses colored lighting from a LIT file.
+pub fn read_lit(data: &[u8], ctx: &BspParseContext, ignore_header: bool) -> BspResult<RgbLighting> {
+	let mut reader = BspByteReader::new(data, ctx);
+
+	if !ignore_header {
+		let magic: [u8; 4] = reader.read()?;
+		if &magic != b"QLIT" {
+			return Err(BspParseError::WrongMagicNumber {
+				found: magic,
+				expected: "QLIT",
+			});
+		}
+
+		let _version: i32 = reader.read()?;
+	}
+
+	if !reader.len().is_multiple_of(3) {
+		return Err(BspParseError::ColorDataSizeNotDevisableBy3(reader.len()));
+	}
+
+	Ok(reader.read_rest().chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect())
 }
 
 /// An offset into the lightmap. Specified as a number of bytes for BSP30 and BSP38, as they always have RGB lighting.

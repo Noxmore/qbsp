@@ -4,12 +4,13 @@
 
 use std::collections::HashMap;
 
-use glam::{uvec2, UVec2};
-use texture_packer::{texture::Texture, TexturePacker, TexturePackerConfig};
+use glam::{UVec2, uvec2};
+use texture_packer::{TexturePacker, TexturePackerConfig, texture::Texture};
 
 use super::ComputeLightmapSettings;
 
 use crate::{
+	BspData,
 	data::{
 		lighting::{BspLighting, LightmapStyle},
 		models::BspFace,
@@ -17,7 +18,6 @@ use crate::{
 	},
 	mesh::lightmap::{ComputeLightmapAtlasError, LightmapAtlas, LightmapInfo, PerSlotLightmapData, PerStyleLightmapData},
 	util::Rect,
-	BspData,
 };
 
 /// A trait for packing lightmaps into texture atlas'. Specifically using image::RgbImage.

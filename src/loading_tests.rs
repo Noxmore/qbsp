@@ -6,6 +6,10 @@ use crate::{
 	util::{quake_string_to_utf8, quake_string_to_utf8_lossy},
 };
 
+fn default<T: Default>() -> T {
+	T::default()
+}
+
 #[derive(Clone, Copy)]
 pub struct TestingBsp {
 	pub name: &'static str,
@@ -64,7 +68,10 @@ fn use_bspx_rgb_lighting() {
 		let with_usage = BspData::parse(BspParseInput {
 			bsp,
 			lit: None,
-			settings: BspParseSettings { use_bspx_rgb_lighting: true },
+			settings: BspParseSettings {
+				use_bspx_rgb_lighting: true,
+				..default()
+			},
 		})
 		.unwrap();
 
@@ -73,6 +80,7 @@ fn use_bspx_rgb_lighting() {
 			lit: None,
 			settings: BspParseSettings {
 				use_bspx_rgb_lighting: false,
+				..default()
 			},
 		})
 		.unwrap();
@@ -103,36 +111,6 @@ fn lit_loading() {
 		};
 
 		assert!(matches!(data.lighting, Some(BspLighting::Colored(_))));
-	}
-}
-
-#[test]
-fn prase_bspx_lumps() {
-	for TestingBsp { name, bsp, lit } in EXAMPLE_BSPS.iter().copied() {
-		println!("{name}");
-
-		let data = match BspData::parse(BspParseInput {
-			bsp,
-			lit,
-			settings: BspParseSettings::default(),
-		}) {
-			Ok(data) => data,
-			Err(err) => panic!("Error loading {name}: {err}"),
-		};
-
-		// For nice error messages
-		if let Some(Err(err)) = data.bspx.parse_brush_list(&data.parse_ctx) {
-			panic!("{err}");
-		}
-		if let Err(err) = data.bspx.parse_decoupled_lm(&data.parse_ctx).unwrap() {
-			panic!("{err}");
-		}
-		if let Err(err) = data.bspx.parse_light_grid_octree(&data.parse_ctx).unwrap() {
-			panic!("{err}");
-		}
-
-		// RGB lighting is already handled by `use_bspx_rgb_lighting`
-		// FACENORMALS is already handled by `validate_bounds`
 	}
 }
 
@@ -253,9 +231,27 @@ fn validate_bounds() {
 			assert!(leaf_brush.0 < data.brushes.len().max(1) as u32);
 		}
 
-		if let Some(face_normals) = data.bspx.parse_face_normals(&data.parse_ctx, &data.faces) {
-			let face_normals = face_normals.unwrap();
+		if let Some(light_grid) = &data.bspx.light_grid_octree {
+			assert!(light_grid.root_idx < light_grid.nodes.len().max(1) as u32);
+		}
 
+		if let Some(brush_list) = &data.bspx.brush_list {
+			for model_brushes in brush_list {
+				assert!(model_brushes.model_idx < data.models.len().max(1) as u32);
+			}
+		}
+
+		if let Some(decoupled_lm) = &data.bspx.decoupled_lm {
+			assert_eq!(decoupled_lm.len(), data.faces.len());
+
+			if let Some(lighting) = &data.lighting {
+				for lm_info in decoupled_lm {
+					assert!(lm_info.offset.pixels < lighting.len() as i32);
+				}
+			}
+		}
+
+		if let Some(face_normals) = &data.bspx.face_normals {
 			assert_eq!(face_normals.faces.len(), data.faces.len());
 			for face in &face_normals.faces {
 				validate_range(face.vertex_start, face.vertex_count, face_normals.face_vertices.len());

@@ -37,15 +37,15 @@ pub use data::texture::Palette;
 
 use crate::{
 	data::{
+		LumpDirectory, LumpEntry,
 		brush::{BspBrush, BspBrushSide},
 		bspx::BspxData,
-		lighting::BspLighting,
+		lighting::{BspLighting, read_lit},
 		models::{BspEdge, BspFace, BspModel},
 		nodes::{BspClipNode, BspLeaf, BspNode, BspPlane},
 		texture::{BspMipTexture, BspTexInfo},
 		util::UBspValue,
 		visdata::BspVisData,
-		LumpDirectory, LumpEntry,
 	},
 	reader::{BspByteReader, BspParseContext, BspValue},
 	util::display_magic_number,
@@ -65,12 +65,22 @@ pub struct BspParseInput<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BspParseSettings {
-	/// If `true`, will use the `RGBLIGHTING` BSPX lump if it exists to supply [`BspData::lighting`]. (Default: `true`)
+	/// If `true`, will use the `RGBLIGHTING` BSPX lump if it exists to supply [`BspData::lighting`].
+	/// This will not work if [`parse_bspx_structures`](Self::parse_bspx_structures) if `false`.
+	///
+	/// NOTE: This moves out of [`BspxData::rgb_lighting`], and is a lossy operation. This should only be used for reading.
+	///
+	/// (Default: `true`)
 	pub use_bspx_rgb_lighting: bool,
+	/// Automatically parses BSPX structures into fields in [`BspxData`]. If `false`, all BSPX lumps will be in [`BspxData::unparsed`]. (Default: `true`)
+	pub parse_bspx_structures: bool,
 }
 impl Default for BspParseSettings {
 	fn default() -> Self {
-		Self { use_bspx_rgb_lighting: true }
+		Self {
+			use_bspx_rgb_lighting: true,
+			parse_bspx_structures: true,
+		}
 	}
 }
 
@@ -97,6 +107,8 @@ pub enum BspParseError {
 	NoBspxDirectory,
 	#[error("No BSPX lump: {0}")]
 	NoBspxLump(String),
+	#[error("Duplicate BSPX lump: {0}")]
+	DuplicateBspxLump(String),
 
 	/// For telling the user exactly where the error occurred in the process.
 	#[error("{0} - {1}")]
@@ -358,9 +370,7 @@ impl BspData {
 
 		let lump_dir: LumpDirectory = reader.read()?;
 
-		let bspx = BspxData::new(bsp, &lump_dir.bspx).job("Reading BSPX data")?;
-
-		let data = Self {
+		let mut data = Self {
 			entities: lump_dir.entities.get(bsp)?.to_vec(),
 			planes: read_lump(bsp, lump_dir.planes, "planes", &ctx)?,
 			textures: if let Some(tex_lump) = *lump_dir.textures {
@@ -374,9 +384,7 @@ impl BspData {
 			tex_info: read_lump(bsp, lump_dir.tex_info, "texture infos", &ctx)?,
 			faces: read_lump(bsp, lump_dir.faces, "faces", &ctx)?,
 			lighting: if let Some(lit) = lit {
-				Some(BspLighting::read_lit(lit, &ctx, false).job("Parsing .lit file")?)
-			} else if let Some(lighting) = bspx.parse_rgb_lighting(&ctx).transpose()?.filter(|_| settings.use_bspx_rgb_lighting) {
-				Some(lighting)
+				Some(BspLighting::Colored(read_lit(lit, &ctx, false).job("Parsing .lit file")?))
 			} else if !lump_dir.lighting.is_empty() {
 				Some(BspByteReader::new(lump_dir.lighting.get(bsp)?, &ctx).read()?)
 			} else {
@@ -408,10 +416,22 @@ impl BspData {
 				Vec::new()
 			},
 
-			bspx,
+			bspx: BspxData::default(), // To be set in a moment.
 
 			parse_ctx: ctx,
 		};
+
+		if let Some(bspx_dir) = &lump_dir.bspx {
+			let mut bspx = BspxData::parse(bsp, bspx_dir, &data).job("Reading BSPX data")?;
+
+			if settings.use_bspx_rgb_lighting
+				&& let Some(lighting) = mem::take(&mut bspx.rgb_lighting)
+			{
+				data.lighting = Some(BspLighting::Colored(lighting));
+			}
+
+			data.bspx = bspx;
+		}
 
 		Ok(data)
 	}
