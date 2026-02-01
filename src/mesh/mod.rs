@@ -29,7 +29,7 @@ pub struct ExportedMesh {
 	pub normals: Vec<Vec3>,
 
 	/// Tangent vectors of vertices in this mesh. NOTE: These are in Z-up coordinate space.
-	/// 
+	///
 	/// The fourth element is the bitangent sign so that
 	/// ```ignore
 	/// bitangent = cross(normal, tangent.xyz) * tangent.w
@@ -131,7 +131,7 @@ impl BspData {
 
 						let cross_bi_tangent = normal.cross(tangent);
 						let bi_tangent_sign = if cross_bi_tangent.dot(bi_tangent) < 0. { -1. } else { 1. };
-						
+
 						tangents.push(tangent.extend(bi_tangent_sign));
 					} else {
 						mesh.normals.push(if face.plane_side.0 == 0 { plane.normal } else { -plane.normal });
