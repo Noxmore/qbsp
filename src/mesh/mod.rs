@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use glam::{IVec2, UVec2, Vec2, Vec3, vec2};
+use glam::{IVec2, UVec2, Vec2, Vec3, Vec4, vec2};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -24,17 +24,32 @@ pub mod lightmap;
 pub struct ExportedMesh {
 	/// Positions of vertices in this mesh. NOTE: These are in Z-up coordinate space.
 	pub positions: Vec<Vec3>,
+
 	/// Normal vectors of vertices in this mesh. NOTE: These are in Z-up coordinate space.
 	pub normals: Vec<Vec3>,
+
+	/// Tangent vectors of vertices in this mesh. NOTE: These are in Z-up coordinate space.
+	/// 
+	/// The fourth element is the bitangent sign so that
+	/// ```ignore
+	/// bitangent = cross(normal, tangent.xyz) * tangent.w
+	/// ```
+	///
+	/// These are only set if the BSP contains the `FACENORMALS` BSPX lump.
+	pub tangents: Option<Vec<Vec4>>,
+
 	/// Normalized texture coordinates. (0..1)
 	pub uvs: Vec<Vec2>,
+
 	/// `true` if the uvs have been scaled based on texture size, otherwise `false`.
 	///
 	/// Scaling will not occur if the texture's size isn't stored in the BSP, such as in BSP38 (Quake 2) files.
 	/// For those, it is up to you to divide all elements of [`ExportedMesh::uvs`] by the size of the texture by the name of [`ExportedMesh::texture`].
 	pub prescaled_uvs: bool,
+
 	/// Optional uvs for the lightmap atlas.
 	pub lightmap_uvs: Option<Vec<Vec2>>,
+
 	/// Triangle list.
 	pub indices: Vec<[u32; 3]>,
 
@@ -78,9 +93,14 @@ impl BspData {
 		let mut meshes = Vec::with_capacity(grouped_faces.len());
 
 		for ((texture, tex_flags), faces) in grouped_faces {
-			let mut mesh = ExportedMesh { ..Default::default() };
-			mesh.texture = texture;
-			mesh.tex_flags = tex_flags;
+			let mut mesh = ExportedMesh {
+				texture,
+				tex_flags,
+				..Default::default()
+			};
+
+			// If this is empty, the mesh will have `None`.
+			let mut tangents = Vec::new();
 
 			for (face_idx, face) in faces {
 				mesh.faces.push(face_idx);
@@ -97,9 +117,25 @@ impl BspData {
 				let mut lightmap_world_uvs: Vec<Vec2> = Vec::with_capacity(face.num_edges.0 as usize);
 
 				let first_index = mesh.positions.len() as u32;
-				for pos in face.vertices(self) {
+				for (vertex_idx, pos) in face.vertices(self).enumerate() {
 					mesh.positions.push(pos);
-					mesh.normals.push(if face.plane_side.0 == 0 { plane.normal } else { -plane.normal });
+					if let Some(face_normals) = &self.bspx.face_normals {
+						let vertex_normal_idx = face_normals.faces[face_idx as usize].vertex_start as usize + vertex_idx;
+						let vertex_normal_info = face_normals.face_vertices[vertex_normal_idx];
+
+						let normal = face_normals.unique_vecs[vertex_normal_info.normal_idx as usize];
+						let tangent = face_normals.unique_vecs[vertex_normal_info.tangent_idx as usize];
+						let bi_tangent = face_normals.unique_vecs[vertex_normal_info.bi_tangent_idx as usize];
+
+						mesh.normals.push(normal);
+
+						let cross_bi_tangent = normal.cross(tangent);
+						let bi_tangent_sign = if cross_bi_tangent.dot(bi_tangent) < 0. { -1. } else { 1. };
+						
+						tangents.push(tangent.extend(bi_tangent_sign));
+					} else {
+						mesh.normals.push(if face.plane_side.0 == 0 { plane.normal } else { -plane.normal });
+					}
 
 					let uv = tex_info.projection.project(pos);
 
@@ -120,6 +156,10 @@ impl BspData {
 					assert_eq!(uvs.len(), face.num_edges.0 as usize);
 					mesh.lightmap_uvs.get_or_insert_with(Vec::new).extend(uvs);
 				}
+			}
+
+			if !tangents.is_empty() {
+				mesh.tangents = Some(tangents);
 			}
 
 			meshes.push(mesh);
