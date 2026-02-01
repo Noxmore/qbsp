@@ -32,6 +32,6 @@ I might work on these at a later date, but if anyone wants to help out or just g
 # Version support table
 I wish these used whatever was in your project, but at the time of writing, wildcards just makes Cargo just choose the latest version rather what what is best for you.
 
-| QBSP | bevy_reflect | glam |
-|------|--------------|------|
-| 0.13 | 0.18         | 0.30 |
+| QBSP      | bevy_reflect | glam |
+|-----------|--------------|------|
+| 0.13-0.14 | 0.18         | 0.30 |
