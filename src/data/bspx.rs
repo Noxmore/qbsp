@@ -150,6 +150,12 @@ impl BspxData {
 			&& self.face_normals.is_none()
 			&& self.unparsed.is_empty()
 	}
+
+	/// BSPX data must be aligned to 4 bytes, this little helper function handles that.
+	#[inline]
+	pub fn align_offset(offset: usize) -> usize {
+		(offset + 3) & !3
+	}
 }
 
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.

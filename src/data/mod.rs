@@ -182,12 +182,9 @@ impl BspValue for LumpDirectory {
 		};
 
 		let bspx_offset = dir.bsp_entries().map(|entry| entry.offset + entry.len).max().unwrap();
-		// Unhelpful hack, see https://github.com/Noxmore/qbsp/issues/12
-		/* if matches!(reader.ctx.format, BspFormat::BSP38 | BspFormat::BSP38Qbism) {
-			bspx_offset += 3;
-		} */
+		let bspx_offset = BspxData::align_offset(bspx_offset as usize);
 
-		match reader.with_pos(bspx_offset as usize).read::<BspxDirectory>() {
+		match reader.with_pos(bspx_offset).read::<BspxDirectory>() {
 			Ok(bspx_dir) => dir.bspx = Some(bspx_dir),
 			Err(BspParseError::NoBspxDirectory) => {}
 			Err(err) => return Err(BspParseError::DoingJob("Reading BSPX directory".to_string(), Box::new(err))),
