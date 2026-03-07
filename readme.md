@@ -30,7 +30,7 @@ I might work on these at a later date, but if anyone wants to help out or just g
 - BSP writing
 
 # Version support table
-I wish these used whatever was in your project, but at the time of writing, wildcards just makes Cargo just choose the latest version rather what what is best for you.
+I wish these used whatever was in your project, but at the time of writing, wildcards make Cargo just choose the latest version rather what what is best for you.
 
 | QBSP      | bevy_reflect | glam |
 |-----------|--------------|------|
