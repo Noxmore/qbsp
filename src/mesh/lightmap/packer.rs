@@ -10,11 +10,7 @@ use texture_packer::{TexturePacker, TexturePackerConfig, texture::Texture};
 use super::ComputeLightmapSettings;
 
 use crate::{
-	data::{
-		lighting::{BspLighting, LightmapStyle},
-		models::BspFace,
-		texture::BspTexInfo,
-	},
+	data::lighting::{BspLighting, LightmapStyle},
 	mesh::lightmap::{ComputeLightmapAtlasError, LightmapAtlas, LightmapInfo, PerSlotLightmapData, PerStyleLightmapData},
 	util::Rect,
 };
@@ -39,10 +35,7 @@ pub struct LightmapPackerFaceView<'a> {
 	pub lm_info: &'a LightmapInfo,
 
 	pub face_idx: usize,
-	/// Shortcut for `bsp.faces[face_idx]`.
-	pub face: &'a BspFace,
-	/// Shortcut for `bsp.tex_info[bsp.faces[face_idx].texture_info_idx]`.
-	pub tex_info: &'a BspTexInfo,
+	pub lightmap_styles: [LightmapStyle; 4],
 	/// Shortcut for `bsp.lighting` since it's guaranteed to be [`Some`].
 	pub lighting: &'a BspLighting,
 }
@@ -161,11 +154,11 @@ impl LightmapPacker for PerStyleLightmapPacker {
 	}
 
 	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
-		if view.face.lightmap_styles[0] == LightmapStyle::NONE {
+		if view.lightmap_styles[0] == LightmapStyle::NONE {
 			Self::create_single_color_input(view.lm_info.extents.lightmap_size(), [0; 3])
 		} else {
 			let mut lightmaps = PerStyleLightmapData::new(view.lm_info.extents.lightmap_size());
-			for (i, style) in view.face.lightmap_styles.into_iter().enumerate() {
+			for (i, style) in view.lightmap_styles.into_iter().enumerate() {
 				if style == LightmapStyle::NONE {
 					break;
 				}
@@ -248,7 +241,7 @@ impl LightmapPacker for PerSlotLightmapPacker {
 
 	fn read_from_face(&self, view: LightmapPackerFaceView) -> Self::Input {
 		let mut i = 0;
-		view.face.lightmap_styles.map(|style| {
+		view.lightmap_styles.map(|style| {
 			let UVec2 { x: width, y: height } = view.lm_info.extents.lightmap_size();
 
 			let image = image::RgbImage::from_fn(width, height, |x, y| {

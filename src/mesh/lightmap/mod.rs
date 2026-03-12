@@ -59,10 +59,11 @@ pub enum ComputeLightmapAtlasError {
 	NoLightmaps,
 }
 
-struct ReservedLightmapPixel {
-	position: Option<UVec2>,
-	color: [u8; 3],
+pub struct ReservedLightmapPixel {
+	pub position: Option<UVec2>,
+	pub color: [u8; 3],
 }
+
 impl ReservedLightmapPixel {
 	pub fn new(color: [u8; 3]) -> Self {
 		Self { position: None, color }
@@ -71,6 +72,7 @@ impl ReservedLightmapPixel {
 	pub fn get_uvs<P: LightmapPacker>(
 		&mut self,
 		lightmap_packer: &mut P,
+		num_edges: usize,
 		view: LightmapPackerFaceView,
 	) -> Result<FaceUvs, ComputeLightmapAtlasError> {
 		let position = match self.position {
@@ -86,7 +88,7 @@ impl ReservedLightmapPixel {
 			}
 		};
 
-		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); view.face.num_edges.0 as usize])
+		Ok(smallvec![position.as_vec2() + Vec2::splat(0.5); num_edges])
 	}
 }
 
@@ -134,8 +136,7 @@ impl BspData {
 				lm_info: &lm_info,
 
 				face_idx,
-				face,
-				tex_info,
+				lightmap_styles: face.lightmap_styles,
 				lighting,
 			};
 
@@ -143,9 +144,9 @@ impl BspData {
 				lightmap_uvs.insert(
 					face_idx as u32,
 					if tex_info.flags.texture_flags.unwrap_or_default() == BspTexFlags::Normal {
-						empty_reserved_pixel.get_uvs(&mut packer, view)?
+						empty_reserved_pixel.get_uvs(&mut packer, face.num_edges.0 as usize, view)?
 					} else {
-						special_reserved_pixel.get_uvs(&mut packer, view)?
+						special_reserved_pixel.get_uvs(&mut packer, face.num_edges.0 as usize, view)?
 					},
 				);
 				continue;
