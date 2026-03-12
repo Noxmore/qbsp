@@ -10,7 +10,6 @@ use texture_packer::{TexturePacker, TexturePackerConfig, texture::Texture};
 use super::ComputeLightmapSettings;
 
 use crate::{
-	BspData,
 	data::{
 		lighting::{BspLighting, LightmapStyle},
 		models::BspFace,
@@ -38,8 +37,6 @@ pub trait LightmapPacker {
 #[derive(Clone, Copy)]
 pub struct LightmapPackerFaceView<'a> {
 	pub lm_info: &'a LightmapInfo,
-
-	pub bsp: &'a BspData,
 
 	pub face_idx: usize,
 	/// Shortcut for `bsp.faces[face_idx]`.

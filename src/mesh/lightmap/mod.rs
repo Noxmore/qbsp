@@ -133,8 +133,6 @@ impl BspData {
 			let view = LightmapPackerFaceView {
 				lm_info: &lm_info,
 
-				bsp: self,
-
 				face_idx,
 				face,
 				tex_info,
