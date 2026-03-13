@@ -122,23 +122,22 @@ impl BspData {
 			let decoupled_lightmap = self.bspx.decoupled_lm.as_ref().map(|lm_infos| lm_infos[face_idx]);
 
 			let lm_extents;
+			let lm_uvs: FaceUvs;
 			let lm_info = match &decoupled_lightmap {
 				Some(lm_info) => {
-					let uvs: FaceUvs = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
-					lm_extents = FaceExtents::new_decoupled(uvs.iter().copied(), lm_info);
+					lm_uvs = face.vertices(self).map(|pos| lm_info.projection.project(pos)).collect();
+					lm_extents = FaceExtents::new_decoupled(lm_uvs.iter().copied(), lm_info);
 
 					LightmapInfo {
-						uvs,
 						lightmap_size: lm_extents.lightmap_size(),
 						lightmap_offset: lm_info.offset.pixels,
 					}
 				}
 				None => {
-					let uvs: FaceUvs = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
-					lm_extents = FaceExtents::new(uvs.iter().copied());
+					lm_uvs = face.vertices(self).map(|pos| tex_info.projection.project(pos)).collect();
+					lm_extents = FaceExtents::new(lm_uvs.iter().copied());
 
 					LightmapInfo {
-						uvs,
 						lightmap_size: lm_extents.lightmap_size(),
 						lightmap_offset: face.lightmap_offset.pixels,
 					}
@@ -172,7 +171,7 @@ impl BspData {
 			lightmap_uvs.insert(
 				face_idx as u32,
 				lm_extents
-					.compute_lightmap_uvs(lm_info.uvs, (frame.min + settings.extrusion).as_vec2())
+					.compute_lightmap_uvs(lm_uvs, (frame.min + settings.extrusion).as_vec2())
 					.collect(),
 			);
 		}
@@ -205,8 +204,6 @@ impl BspData {
 /// Computed information about the specifics of how a lightmap applies to a face.
 #[derive(Debug, Clone)]
 pub struct LightmapInfo {
-	/// The vertices of the face projected onto it's texture or decoupled lightmap.
-	pub uvs: FaceUvs,
 	pub lightmap_size: UVec2,
 	/// The offset into the lightmap lump in bytes to read the lightmap data or -1. Will need to be multiplied by 3 for colored lighting.
 	pub lightmap_offset: i32,
