@@ -181,23 +181,22 @@ where
 		DynamicImage: From<ImageBuffer<P, Vec<P::Subpixel>>>,
 	{
 		if view.lightmap_styles[0] == LightmapStyle::NONE {
-			Self::create_single_color_input(view.lm_info.extents.lightmap_size(), [0; 3])
+			Self::create_single_color_input(view.lm_info.lightmap_size, [0; 3])
 		} else {
-			let mut lightmaps = PerStyleLightmapData::<Image>::new(view.lm_info.extents.lightmap_size());
+			let mut lightmaps = PerStyleLightmapData::<Image>::new(view.lm_info.lightmap_size);
 			for (i, style) in view.lightmap_styles.into_iter().enumerate() {
 				if style == LightmapStyle::NONE {
 					break;
 				}
 
-				let lm_size = view.lm_info.extents.lightmap_size();
+				let lm_size = view.lm_info.lightmap_size;
 
-				let start = view.lm_info.compute_lighting_index(i, 0, 0);
-				let end = view
-					.lm_info
-					.compute_lighting_index(i, lm_size.x.saturating_sub(1), lm_size.y.saturating_sub(1));
+				let start = view.lm_info.compute_lighting_index(i, 0, 0) * P::CHANNEL_COUNT as usize;
+				let end = start + view.lm_info.lightmap_size.element_product() as usize * P::CHANNEL_COUNT as usize;
 
-				let lightmap_data = image::ImageBuffer::<P, _>::from_raw(lm_size.x, lm_size.y, view.lighting_buffer[start..=end].to_vec())
-					.expect("Failed to create lightmap image");
+				let Some(buffer) = view.lighting_buffer.get(start..end) else { return Self::create_single_color_input(lm_size, [0; 3]) };
+				let lightmap_data =
+					image::ImageBuffer::<P, _>::from_raw(lm_size.x, lm_size.y, buffer.to_vec()).expect("Failed to create lightmap image");
 				let rgb_image = DynamicImage::from(lightmap_data).into();
 
 				lightmaps.insert(style, rgb_image).unwrap();
@@ -287,7 +286,7 @@ impl LightmapPacker for PerSlotLightmapPackerRgb {
 	{
 		let mut i = 0;
 		view.lightmap_styles.map(|style| {
-			let UVec2 { x: width, y: height } = view.lm_info.extents.lightmap_size();
+			let UVec2 { x: width, y: height } = view.lm_info.lightmap_size;
 
 			let image = if style == LightmapStyle::NONE {
 				image::RgbImage::from_pixel(width, height, self.settings.default_color.into())
