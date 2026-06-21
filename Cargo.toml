@@ -29,7 +29,7 @@ license.workspace = true
 qbsp_macros = { version = "0.14.1", path = "qbsp_macros" }
 
 bitflags = "2"
-glam = "0.30" # See paragraph below.
+glam = "0.32" # See paragraph below.
 image = { version = "0.25", default-features = false }
 smallvec = "1"
 texture_packer = { version = "0.30", optional = true }
@@ -42,7 +42,7 @@ derive_more = { version = "2", features = [
 # The API is pretty stable, and I'd rather not get tied to Bevy's release cycle.
 # Unfortunately, Cargo doesn't seem to know how to resolve a wildcard to anything other than
 # the latest version in this situation, so the version has to be more precise than 0.*.
-bevy_reflect = { version = "0.18", package = "bevy_reflect", features = [
+bevy_reflect = { version = "0.19", package = "bevy_reflect", features = [
 	"glam",
 ], optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
