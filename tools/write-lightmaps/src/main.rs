@@ -25,7 +25,7 @@ fn main() {
 	fs::create_dir("target/lightmaps/per-slot").unwrap();
 
 	eprintln!("Computing per slot lightmap atlas");
-	let atlas = data.compute_lightmap_atlas(PerSlotLightmapPacker::new(lightmap_settings)).unwrap();
+	let atlas = data.compute_lightmap_atlas(PerSlotLightmapPackerRgb::new(lightmap_settings)).unwrap();
 	for (slot_idx, slot) in atlas.data.slots.into_iter().enumerate() {
 		slot.save_with_format(format!("target/lightmaps/per-slot/slot_{slot_idx}.png"), image::ImageFormat::Png)
 			.unwrap();
@@ -38,7 +38,7 @@ fn main() {
 
 	fs::create_dir("target/lightmaps/per-style").unwrap();
 	eprintln!("Computing per style lightmap atlas");
-	let atlas = data.compute_lightmap_atlas(PerStyleLightmapPacker::new(lightmap_settings)).unwrap();
+	let atlas = data.compute_lightmap_atlas(PerStyleLightmapPackerRgb::new(lightmap_settings)).unwrap();
 	for (style, image) in atlas.data.inner() {
 		image
 			.save_with_format(format!("target/lightmaps/per-style/{}.png", style.0), image::ImageFormat::Png)

@@ -7,5 +7,5 @@ pub use qbsp_macros::{BspValue, BspVariableValue};
 #[cfg(feature = "meshing")]
 pub use crate::mesh::{
 	ExportedMesh,
-	lightmap::{ComputeLightmapSettings, LightmapUvMap, PerSlotLightmapPacker, PerStyleLightmapPacker},
+	lightmap::{ComputeLightmapSettings, LightmapUvMap, PerSlotLightmapPackerRgb, PerStyleLightmapPackerRgb},
 };
