@@ -4,7 +4,7 @@ use std::{collections::HashMap, str::FromStr};
 
 #[cfg(feature = "bevy_reflect")]
 use bevy_reflect::Reflect;
-use glam::{U16Vec2, UVec3, Vec3};
+use glam::{IVec3, U16Vec2, UVec3, Vec3};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
@@ -80,7 +80,10 @@ impl BspValue for BspxDirectory {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct BspxData {
 	pub rgb_lighting: Option<RgbLighting>,
-	pub light_grid_octree: Option<LightGridOctree>,
+	/// Solid light grid data.
+	pub light_grid_octree: Option<LightGridOctree<SolidLightGridSample>>,
+	/// Directional light grid data.
+	pub light_grids: Option<LightGrids>,
 	pub brush_list: Option<BrushList>,
 	pub decoupled_lm: Option<DecoupledLightmaps>,
 	pub face_normals: Option<FaceNormals>,
@@ -111,6 +114,10 @@ impl BspxData {
 				"LIGHTGRID_OCTREE" => {
 					check_duplicate!(light_grid_octree);
 					data.light_grid_octree = Some(BspByteReader::new(lump, &bsp_data.parse_ctx).read()?);
+				}
+				"LIGHTGRIDS" => {
+					check_duplicate!(light_grids);
+					data.light_grids = Some(parse_lightgrids(BspByteReader::new(lump, &bsp_data.parse_ctx))?);
 				}
 				"BRUSHLIST" => {
 					check_duplicate!(brush_list);
@@ -145,6 +152,7 @@ impl BspxData {
 	pub fn is_empty(&self) -> bool {
 		self.rgb_lighting.is_none()
 			&& self.light_grid_octree.is_none()
+			&& self.light_grids.is_none()
 			&& self.brush_list.is_none()
 			&& self.decoupled_lm.is_none()
 			&& self.face_normals.is_none()
@@ -158,33 +166,52 @@ impl BspxData {
 	}
 }
 
+pub type LightGrids = Vec<SubLightGrid>;
+type SubLightGrid = LightGridOctree<DirectionalLightGridSample>;
+
+pub fn parse_lightgrids(mut reader: BspByteReader) -> BspResult<LightGrids> {
+	let mut sub_grids = LightGrids::new();
+
+	let mut i: usize = 0;
+	while reader.in_bounds() {
+		let _sub_grid_size: u32 = reader.read()?;
+		sub_grids.push(reader.read::<SubLightGrid>().job(|| format!("Parsing LIGHTGRIDS BSPX sub-grid {i}"))?);
+		i += 1;
+	}
+
+	Ok(sub_grids)
+}
+
 /// 3d lighting data stored in an octree. Referenced from the [FTE BSPX specification](https://github.com/fte-team/fteqw/blob/master/specs/bspx.txt) and ericw-tools source code.
 #[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LightGridOctree {
+pub struct LightGridOctree<Sample: LightGridSample> {
 	pub step: Vec3,
 	pub size: UVec3,
 	pub mins: Vec3,
 	pub num_styles: u8,
+	/// The index of the root node.
 	pub root_idx: u32,
 	pub nodes: BspVariableArray<LightGridNode, u32>,
-	pub leafs: BspVariableArray<LightGridLeaf, u32>,
+	pub leafs: BspVariableArray<LightGridLeaf<Sample>, u32>,
 }
 
 #[derive(BspValue, Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct LightGridNode {
-	pub division_point: UVec3,
+	pub division_point: IVec3,
 	pub children: [u32; 8],
 }
 impl LightGridNode {
+	/// If this bit is 1 in a node child, the child index points to a leaf instead of a node.
 	pub const LEAF: u32 = 1 << 31;
+	/// If a node child index is equal to this, there is no child there.
 	pub const MISSING: u32 = 1 << 30;
 
 	#[rustfmt::skip]
-	#[allow(clippy::identity_op)]
+	#[expect(clippy::identity_op)]
 	pub fn get_child_index_towards(&self, point: Vec3) -> u32 {
 		self.children[
 			(((point.z >= self.division_point.z as f32) as usize) << 0) |
@@ -197,16 +224,21 @@ impl LightGridNode {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LightGridLeaf {
+pub struct LightGridLeaf<Sample> {
 	pub mins: UVec3,
 	size: UVec3,
 
-	data: Vec<LightGridCell>,
+	data: Vec<LightGridCell<Sample>>,
 }
-impl BspValue for LightGridLeaf {
+impl<Sample: LightGridSample> BspValue for LightGridLeaf<Sample> {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let mins: UVec3 = reader.read().job("position")?;
 		let size: UVec3 = reader.read().job("size")?;
+
+		// The ericw-tools loading code marks this as unused.
+		if Sample::HAS_MAX_STYLES_FIELD {
+			let _max_styles: u8 = reader.read().job("max_styles")?;
+		}
 
 		let mut data = Vec::with_capacity(size.element_product() as usize);
 
@@ -221,9 +253,9 @@ impl BspValue for LightGridLeaf {
 		unimplemented!("LightGridLeaf is of variable size")
 	}
 }
-impl LightGridLeaf {
+impl<Sample> LightGridLeaf<Sample> {
 	#[inline]
-	pub fn cells(&self) -> &[LightGridCell] {
+	pub fn cells(&self) -> &[LightGridCell<Sample>] {
 		&self.data
 	}
 
@@ -234,11 +266,11 @@ impl LightGridLeaf {
 	}
 
 	/// Returns the cell at the specified position, panics if the position is out of bounds.
-	pub fn get_cell(&self, x: u32, y: u32, z: u32) -> &LightGridCell {
+	pub fn get_cell(&self, x: u32, y: u32, z: u32) -> &LightGridCell<Sample> {
 		&self.data[self.cell_idx(x, y, z)]
 	}
 	/// Returns the cell at the specified position, panics if the position is out of bounds.
-	pub fn get_cell_mut(&mut self, x: u32, y: u32, z: u32) -> &mut LightGridCell {
+	pub fn get_cell_mut(&mut self, x: u32, y: u32, z: u32) -> &mut LightGridCell<Sample> {
 		let idx = self.cell_idx(x, y, z);
 		&mut self.data[idx]
 	}
@@ -252,16 +284,16 @@ impl LightGridLeaf {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub enum LightGridCell {
+pub enum LightGridCell<Sample> {
 	/// Cell is filled by geometry.
 	Occluded,
 	/// Cell is filled,
-	Filled(SmallVec<[LightmapCellSample; 4]>),
+	Filled(SmallVec<[Sample; 4]>),
 }
-impl BspValue for LightGridCell {
+impl<Sample: LightGridSample> BspValue for LightGridCell<Sample> {
 	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
 		let style_count: u8 = reader.read().job("style count")?;
-		if style_count == 255 {
+		if style_count == 0xff {
 			return Ok(Self::Occluded);
 		}
 
@@ -278,12 +310,87 @@ impl BspValue for LightGridCell {
 	}
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum LightGridSampleDirection {
+	PosX = 0,
+	NegX = 1,
+	PosY = 2,
+	NegY = 3,
+	PosZ = 4,
+	NegZ = 5,
+}
+
+/// Used with generics to share structures between the `LIGHTGRIDS` and `LIGHTGRID_OCTREE` BSPX lumps.
+pub trait LightGridSample: BspValue + Clone + Copy {
+	const HAS_MAX_STYLES_FIELD: bool;
+	fn style(&self) -> LightmapStyle;
+	fn sample(&self, direction: LightGridSampleDirection) -> [u8; 3];
+}
+
+/// Light grid sample for the `LIGHTGRID_OCTREE` BSPX lump. Stores a single color.
 #[derive(BspValue, Debug, Clone, Copy)]
 #[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct LightmapCellSample {
+pub struct SolidLightGridSample {
 	pub style: LightmapStyle,
 	pub color: [u8; 3],
+}
+impl LightGridSample for SolidLightGridSample {
+	const HAS_MAX_STYLES_FIELD: bool = false;
+
+	#[inline]
+	fn style(&self) -> LightmapStyle {
+		self.style
+	}
+
+	#[inline]
+	fn sample(&self, _direction: LightGridSampleDirection) -> [u8; 3] {
+		self.color
+	}
+}
+
+/// Light grid sample for the `LIGHTGRIDS` BSPX lump. Stores a color for each of the 6 cardinal directions.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "bevy_reflect", derive(Reflect))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct DirectionalLightGridSample {
+	pub style: LightmapStyle,
+	pub colors: [[u8; 3]; 6],
+}
+impl BspValue for DirectionalLightGridSample {
+	fn bsp_parse(reader: &mut BspByteReader) -> BspResult<Self> {
+		let style: LightmapStyle = reader.read().job("Reading style")?;
+		let lit_side_mask: u8 = reader.read().job("Reading lit side mask")?;
+
+		let mut colors: [[u8; 3]; 6] = Default::default();
+
+		for (side_idx, color) in colors.iter_mut().enumerate() {
+			if (lit_side_mask & (1 << side_idx)) != 0 {
+				*color = reader.read()?;
+			} else {
+				*color = [0; 3];
+			}
+		}
+
+		Ok(Self { style, colors })
+	}
+
+	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
+		unimplemented!("DirectionalLightGridCellSample is of variable size")
+	}
+}
+impl LightGridSample for DirectionalLightGridSample {
+	const HAS_MAX_STYLES_FIELD: bool = true;
+
+	#[inline]
+	fn style(&self) -> LightmapStyle {
+		self.style
+	}
+
+	#[inline]
+	fn sample(&self, direction: LightGridSampleDirection) -> [u8; 3] {
+		self.colors[direction as usize]
+	}
 }
 
 #[derive(BspValue, Debug, Clone, Copy)]

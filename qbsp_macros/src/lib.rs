@@ -106,6 +106,7 @@ pub fn bsp_variable_value_derive(input: proc_macro::TokenStream) -> proc_macro::
 pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	let ident = input.ident;
+	let (impl_generics, type_generics, _) = input.generics.split_for_impl();
 
 	let (bsp_parse_contents, bsp_struct_size_contents) = match input.data {
 		Data::Struct(data) => match data.fields {
@@ -170,7 +171,7 @@ pub fn bsp_value_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
 	};
 
 	quote! {
-		impl ::qbsp::reader::BspValue for #ident {
+		impl #impl_generics ::qbsp::reader::BspValue for #ident #type_generics {
 			fn bsp_parse(reader: &mut ::qbsp::reader::BspByteReader) -> ::qbsp::BspResult<Self> {
 				#bsp_parse_contents
 			}

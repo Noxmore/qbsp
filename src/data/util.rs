@@ -130,6 +130,7 @@ impl<T: BspValue, N: BspValue + TryInto<usize, Error: std::fmt::Debug>> BspValue
 
 		Ok(Self { inner, _marker: PhantomData })
 	}
+	#[track_caller]
 	fn bsp_struct_size(_ctx: &BspParseContext) -> usize {
 		unimplemented!("{} is of variable size", std::any::type_name::<Self>());
 	}

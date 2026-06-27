@@ -38,6 +38,7 @@ macro_rules! testing_bsp {
 static EXAMPLE_BSPS: &[TestingBsp] = &[
 	testing_bsp!("example-halflife.bsp"),
 	testing_bsp!("example-quake2.bsp"),
+	testing_bsp!("example-qbism.bsp"),
 	testing_bsp!("example-bsp29.bsp"),
 	testing_bsp!("example-bsp2.bsp"),
 ];
@@ -233,6 +234,11 @@ fn validate_bounds() {
 
 		if let Some(light_grid) = &data.bspx.light_grid_octree {
 			assert!(light_grid.root_idx < light_grid.nodes.len().max(1) as u32);
+		}
+		if let Some(light_grids) = &data.bspx.light_grids {
+			for light_grid in light_grids {
+				assert!(light_grid.root_idx < light_grid.nodes.len().max(1) as u32);
+			}
 		}
 
 		if let Some(brush_list) = &data.bspx.brush_list {
