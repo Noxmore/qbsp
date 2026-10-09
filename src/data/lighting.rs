@@ -110,7 +110,7 @@ pub fn read_lit(data: &[u8], ctx: &BspParseContext, ignore_header: bool) -> BspR
 		return Err(BspParseError::ColorDataSizeNotDevisableBy3(reader.len()));
 	}
 
-	Ok(reader.read_rest().chunks_exact(3).map(|v| [v[0], v[1], v[2]]).collect())
+	Ok(reader.read_rest().as_chunks::<3>().0.to_vec())
 }
 
 /// An offset into the lightmap. Specified as a number of bytes for BSP30 and BSP38, as they always have RGB lighting.
